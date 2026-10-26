@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LPIC-1 Trainer</title>
+<meta name="description" content="Interactive LPIC-1 (101-500 / 102-500) learning site: wiki for every objective, quizzes, exam simulator, a bash sandbox and hands-on simulations.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<a class="skip" href="#view">Skip to content</a>
+<header class="topbar">
+  <button class="icon-btn menu-btn" id="menuBtn" aria-label="Toggle navigation" title="Menu">☰</button>
+  <a class="brand" href="#/"><span class="brand-mark">$_</span><span class="brand-text">LPIC-1 Trainer</span></a>
+  <form class="search" id="searchForm" role="search">
+    <input id="searchInput" type="search" placeholder="Search wiki, commands, files…  ( / )" aria-label="Search" autocomplete="off">
+  </form>
+  <span class="sync" id="syncBadge" title="Where your progress is stored">local</span>
+  <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" title="Theme">◐</button>
+  <button class="btn btn-term" id="termBtn" title="Open the sandbox terminal (Ctrl+`)"><span>⌨</span><span class="hide-sm"> Terminal</span></button>
+</header>
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Objectives"></nav>
+  <main id="view" class="view" tabindex="-1"></main>
+</div>
+<section class="drawer" id="drawer" aria-label="Sandbox terminal">
+  <div class="drawer-bar" id="drawerBar">
+    <span class="drawer-title">student@lpic-lab — sandbox <span class="muted">(persistent · try <code>help</code>)</span></span>
+    <span class="drawer-actions">
+      <button class="icon-btn" id="drawerMax" title="Maximize">⤢</button>
+      <button class="icon-btn" id="drawerClose" title="Close (Ctrl+`)">✕</button>
+    </span>
+  </div>
+  <div class="drawer-body" id="drawerTerm"></div>
+</section>
+<div class="modal" id="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true">
+    <button class="icon-btn modal-x" id="modalX" aria-label="Close">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<noscript><p style="padding:2rem">This learning site needs JavaScript.</p></noscript>
+
+<!-- shell simulator -->
+<script src="assets/js/shell/vfs.js"></script>
+<script src="assets/js/shell/world.js"></script>
+<script src="assets/js/shell/parser.js"></script>
+<script src="assets/js/shell/interp.js"></script>
+<script src="assets/js/shell/builtins.js"></script>
+<script src="assets/js/shell/hash.js"></script>
+<script src="assets/js/shell/cmds-files.js"></script>
+<script src="assets/js/shell/cmds-text.js"></script>
+<script src="assets/js/shell/cmds-sys.js"></script>
+<script src="assets/js/shell/cmds-net.js"></script>
+<script src="assets/js/shell/man.js"></script>
+<script src="assets/js/shell/editor.js"></script>
+<script src="assets/js/shell/terminal.js"></script>
+<!-- content -->
+<script src="assets/js/md.js"></script>
+<script src="assets/data/topics.js"></script>
+<script src="assets/data/101.js"></script>
+<script src="assets/data/102.js"></script>
+<script src="assets/data/103.js"></script>
+<script src="assets/data/104.js"></script>
+<script src="assets/data/105.js"></script>
+<script src="assets/data/106.js"></script>
+<script src="assets/data/107.js"></script>
+<script src="assets/data/108.js"></script>
+<script src="assets/data/109.js"></script>
+<script src="assets/data/110.js"></script>
+<script src="assets/data/labs.js"></script>
+<!-- app -->
+<script src="assets/js/store.js"></script>
+<script src="assets/js/sims.js"></script>
+<script src="assets/js/labh.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>

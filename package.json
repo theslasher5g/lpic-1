@@ -1,0 +1,15 @@
+{
+  "name": "lpic1-trainer",
+  "version": "1.0.0",
+  "description": "Interactive LPIC-1 (101-500 / 102-500) learning site: wiki, quizzes, exam simulator, bash sandbox and simulations",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node tests/run.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "license": "MIT"
+}

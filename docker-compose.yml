@@ -1,0 +1,13 @@
+services:
+  lpic1:
+    build: .
+    image: lpic1-trainer:latest
+    container_name: lpic1-trainer
+    ports:
+      - "8080:8080"
+    volumes:
+      - lpic1-data:/data        # SQLite database with your progress + sandbox
+    restart: unless-stopped
+
+volumes:
+  lpic1-data:
