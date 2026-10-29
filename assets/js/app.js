@@ -719,11 +719,63 @@
     }
     return shuffle(alloc.flatMap((x) => shuffle(x.o.quiz).slice(0, x.n)));
   }
+  // time-per-question summary of one exam attempt
+  function examTimeHtml(items, budget) {
+    const answered = items.filter((x) => x.s > 0);
+    if (!answered.length) return '';
+    const avg = answered.reduce((a, x) => a + x.s, 0) / answered.length;
+    const slow = items.slice().sort((a, b) => b.s - a.s).slice(0, 5);
+    const fmt = (s) => (s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`);
+    return `<h3>Time per question</h3><p>Average <b>${fmt(Math.round(avg))}</b> per question (budget in the real exam: ${fmt(Math.round(budget))}).${avg > budget ? ' <span class="badge warn">too slow</span>' : ''}</p>
+      <p class="muted" style="font-size:.88rem;margin-bottom:.3rem">Questions you spent the most time on:</p><ol class="weak-list">${slow.map((x) => `<li><a href="#/obj/${x.q.obj}">${x.q.obj}</a> ${md(x.q.q)} <span class="muted">— ${fmt(x.s)} ${x.ok ? '✓' : '✗'}</span></li>`).join('')}</ol>`;
+  }
+  // SVG line chart of exam scores over time (one line per exam)
+  function examTrendSvg(hist) {
+    const W = 640;
+    const H = 220;
+    const P = 34;
+    const pts = hist.map((e, i) => ({ x: P + (hist.length === 1 ? (W - 2 * P) / 2 : (i * (W - 2 * P)) / (hist.length - 1)), y: H - P - (e.correct / e.total) * (H - 2 * P), e }));
+    const y65 = H - P - 0.65 * (H - 2 * P);
+    const line = (exam) => {
+      const p = pts.filter((q) => q.e.exam === exam);
+      return p.length > 1 ? `<polyline fill="none" stroke="var(${exam === '101' ? '--accent' : '--blue'})" stroke-width="2.5" points="${p.map((q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(' ')}"/>` : '';
+    };
+    return `<svg viewBox="0 0 ${W} ${H}" class="trend" role="img" aria-label="exam scores over time">
+      ${[0, 25, 50, 75, 100].map((v) => { const y = H - P - (v / 100) * (H - 2 * P); return `<line x1="${P}" x2="${W - P}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${P - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}%</text>`; }).join('')}
+      <line x1="${P}" x2="${W - P}" y1="${y65}" y2="${y65}" stroke="var(--warn)" stroke-dasharray="5 4"/><text x="${W - P}" y="${y65 - 5}" text-anchor="end" font-size="11" fill="var(--warn)">pass 65 %</text>
+      ${line('101')}${line('102')}
+      ${pts.map((q) => `<circle cx="${q.x.toFixed(1)}" cy="${q.y.toFixed(1)}" r="5" fill="var(${q.e.exam === '101' ? '--accent' : '--blue'})"><title>${q.e.exam}-500 · ${new Date(q.e.date).toLocaleDateString()} · ${pct(q.e.correct / q.e.total)}%</title></circle>`).join('')}
+    </svg><div class="row" style="font-size:.85rem"><span><span class="dot" style="background:var(--accent)"></span> 101-500</span><span><span class="dot" style="background:var(--blue)"></span> 102-500</span></div>`;
+  }
+  route(/^\/exam\/history$/, () => {
+    const hist = Store.data.exams.slice();
+    if (!hist.length) {
+      view.innerHTML = '<div class="crumbs"><a href="#/exam">Exam simulator</a></div><h1>📈 Exam history</h1><p class="muted">No exam attempts yet — start one in the <a href="#/exam">exam simulator</a>.</p>';
+      return;
+    }
+    // aggregate per topic over all attempts that recorded it
+    const agg = {};
+    for (const e of hist) for (const [t, v] of Object.entries(e.perTopic || {})) {
+      const a = (agg[t] = agg[t] || { ok: 0, n: 0, last: null });
+      a.ok += v.ok;
+      a.n += v.n;
+      a.last = v.ok / v.n;
+    }
+    const best = (ex) => Math.max(0, ...hist.filter((e) => e.exam === ex).map((e) => e.correct / e.total));
+    const last = (ex) => hist.filter((e) => e.exam === ex).slice(-1)[0];
+    const withTimes = hist.filter((e) => e.times && e.times.length);
+    const avgTime = withTimes.length ? withTimes.reduce((a, e) => a + e.times.reduce((b, t) => b + t.s, 0) / e.times.length, 0) / withTimes.length : null;
+    view.innerHTML = `<div class="crumbs"><a href="#/exam">Exam simulator</a></div><h1>📈 Exam history</h1>
+      <div class="grid grid-3">${LPIC.exams.map((ex) => { const l = last(ex.id); return `<div class="card stat"><div class="v">${l ? pct(l.correct / l.total) + '%' : '–'}</div><div class="l">last ${ex.code} · best ${pct(best(ex.id))}% · ${hist.filter((e) => e.exam === ex.id).length} attempt(s)</div></div>`; }).join('')}<div class="card stat"><div class="v">${avgTime === null ? '–' : Math.round(avgTime) + ' s'}</div><div class="l">average time per question (budget 90 s)</div></div></div>
+      <div class="card" style="margin-top:1rem"><h3 style="margin-top:0">Score trend</h3>${examTrendSvg(hist)}</div>
+      <div class="card" style="margin-top:1rem"><h3 style="margin-top:0">Per topic (all attempts)</h3>${Object.keys(agg).length ? `<table><tr><th>Topic</th><th>Correct</th><th>Total</th><th style="width:35%"></th><th>Last attempt</th></tr>${Object.entries(agg).sort().map(([t, a]) => `<tr><td><a href="#/topic/${t}">${t}</a> ${esc(LPIC.topics[t].title)}</td><td>${a.ok}</td><td>${a.n}</td><td><div class="bar ${a.ok / a.n < 0.65 ? 'warn' : ''}"><span style="width:${pct(a.ok / a.n)}%"></span></div></td><td>${pct(a.last)}%</td></tr>`).join('')}</table>` : '<p class="muted">Per-topic results are recorded for new attempts.</p>'}</div>
+      <div class="card" style="margin-top:1rem"><h3 style="margin-top:0">All attempts</h3><div class="tbl-wrap"><table><tr><th>Date</th><th>Exam</th><th>Result</th><th>Time</th><th>Ø per question</th><th>Weakest topics</th></tr>${hist.slice().reverse().map((e) => `<tr><td>${new Date(e.date).toLocaleString()}</td><td>${e.exam}</td><td>${e.correct}/${e.total} = <b>${pct(e.correct / e.total)}%</b> ${e.correct / e.total >= 0.65 ? '<span class="badge good">pass</span>' : '<span class="badge bad">fail</span>'}</td><td>${Math.floor(e.secs / 60)}:${String(e.secs % 60).padStart(2, '0')}</td><td>${e.times && e.times.length ? Math.round(e.times.reduce((a, t) => a + t.s, 0) / e.times.length) + ' s' : '–'}</td><td>${(e.weak || []).map((t) => `<a href="#/topic/${t}">${t}</a>`).join(', ')}</td></tr>`).join('')}</table></div></div>`;
+  });
   route(/^\/exam$/, () => {
     const hist = Store.data.exams.slice().reverse();
     view.innerHTML = `<h1>⏱️ Exam simulator</h1><p class="muted">Like the real LPI exam: <b>60 questions</b>, <b>90 minutes</b>, questions drawn in proportion to the objective weights, mix of single choice, multiple choice and fill-in-the-blank. No feedback until you submit. Practice pass mark: <b>65 %</b> (LPI reports a scaled score of 200–800 with 500 to pass; the raw percentage behind it is not published, so aim higher).</p>
       <div class="grid grid-2">${LPIC.exams.map((ex) => `<div class="card"><h2 style="margin-top:0">${ex.title} <span class="muted" style="font-weight:500">${ex.code}</span></h2><p class="muted" style="font-size:.9rem">${esc(ex.subtitle)}</p><p style="font-size:.9rem">${LPIC.ofExam(ex.id).flatMap((o) => o.quiz).length} questions in the pool · readiness ${pct(readiness(LPIC.ofExam(ex.id)))}%</p><div class="row"><a class="btn btn-primary" href="#/exam/${ex.id}">Start ${ex.code}</a><a class="btn" href="#/exam/${ex.id}?n=20&min=30">Short (20 q / 30 min)</a></div></div>`).join('')}</div>
-      <h2>History</h2>${hist.length ? '<div class="tbl-wrap"><table><tr><th>Date</th><th>Exam</th><th>Result</th><th>Time</th><th>Weakest topics</th></tr>' + hist.map((e) => `<tr><td>${new Date(e.date).toLocaleString()}</td><td>${e.exam}</td><td>${e.correct}/${e.total} = <b>${pct(e.correct / e.total)}%</b> ${e.correct / e.total >= 0.65 ? '<span class="badge good">pass</span>' : '<span class="badge bad">fail</span>'}</td><td>${Math.floor(e.secs / 60)}:${String(e.secs % 60).padStart(2, '0')}</td><td>${esc((e.weak || []).join(', '))}</td></tr>`).join('') + '</table></div>' : '<p class="muted">No attempts yet.</p>'}`;
+      <div class="row" style="margin-top:1.2rem"><h2 style="margin:0">History</h2><span class="spacer"></span>${hist.length ? '<a class="btn" href="#/exam/history">📈 Trend & per-topic analysis</a>' : ''}</div>${hist.length ? '<div class="tbl-wrap"><table><tr><th>Date</th><th>Exam</th><th>Result</th><th>Time</th><th>Weakest topics</th></tr>' + hist.map((e) => `<tr><td>${new Date(e.date).toLocaleString()}</td><td>${e.exam}</td><td>${e.correct}/${e.total} = <b>${pct(e.correct / e.total)}%</b> ${e.correct / e.total >= 0.65 ? '<span class="badge good">pass</span>' : '<span class="badge bad">fail</span>'}</td><td>${Math.floor(e.secs / 60)}:${String(e.secs % 60).padStart(2, '0')}</td><td>${esc((e.weak || []).join(', '))}</td></tr>`).join('') + '</table></div>' : '<p class="muted">No attempts yet.</p>'}`;
   });
   route(/^\/exam\/(101|102)$/, (m, params) => {
     const exam = m[1];
@@ -732,9 +784,18 @@
     const qs = buildExam(exam, total).map(prepare);
     const answers = new Array(qs.length).fill(undefined);
     const flags = new Array(qs.length).fill(false);
+    const spent = new Array(qs.length).fill(0); // ms spent on each question
     let cur = 0;
     let submitted = false;
     const t0 = Date.now();
+    let shownAt = t0;
+    let shownIdx = 0;
+    const track = () => {
+      const now = Date.now();
+      if (!submitted) spent[shownIdx] += now - shownAt;
+      shownAt = now;
+      shownIdx = cur;
+    };
     const end = t0 + minutes * 60000;
     view.innerHTML = `<div class="row"><h1 style="margin:0">Exam ${exam}-500 simulation</h1><span class="spacer"></span><span class="timer" id="timer"></span><button class="btn btn-danger" id="exSubmit">Submit exam</button></div><div class="qnav" id="qnav"></div><div class="quiz card" id="exCard"></div>`;
     const timerEl = $('#timer');
@@ -784,6 +845,7 @@
       answers[cur] = a;
     };
     const show = () => {
+      track();
       const p = qs[cur];
       let h = questionHtml(p, cur, qs.length, answers[cur], submitted);
       if (submitted) {
@@ -827,6 +889,7 @@
       if (submitted) return;
       const unanswered = answers.filter((a) => a === undefined || a === null || a === '' || (Array.isArray(a) && !a.length)).length;
       if (Date.now() < end && unanswered && !confirm(`${unanswered} question(s) unanswered. Submit anyway?`)) return;
+      track();
       submitted = true;
       clearInterval(iv);
       const secs = Math.round((Date.now() - t0) / 1000);
@@ -851,7 +914,14 @@
         .sort((a, b) => a[1].ok / a[1].n - b[1].ok / b[1].n)
         .slice(0, 2)
         .map(([t]) => t);
-      Store.addExam({ exam, date: Date.now(), correct: ok, total: qs.length, secs, weak });
+      const perObj = {};
+      qs.forEach((p, i) => {
+        const o = (perObj[p.q.obj] = perObj[p.q.obj] || { ok: 0, n: 0 });
+        o.n++;
+        if (isCorrect(p, answers[i])) o.ok++;
+      });
+      const times = qs.map((p, i) => ({ id: p.q.id, s: Math.round(spent[i] / 1000), ok: isCorrect(p, answers[i]) }));
+      Store.addExam({ exam, date: Date.now(), correct: ok, total: qs.length, secs, weak, perTopic, perObj, times });
       const passed = ok / qs.length >= 0.65;
       view.insertAdjacentHTML(
         'afterbegin',
@@ -859,7 +929,7 @@
         <table><tr><th>Topic</th><th>Score</th><th></th></tr>${Object.entries(perTopic)
           .sort()
           .map(([t, v]) => `<tr><td>${t} ${esc(LPIC.topics[t].title)}</td><td>${v.ok}/${v.n}</td><td style="width:40%"><div class="bar ${v.ok / v.n < 0.65 ? 'warn' : ''}"><span style="width:${pct(v.ok / v.n)}%"></span></div></td></tr>`)
-          .join('')}</table><div class="row" style="margin-top:.8rem"><a class="btn btn-primary" href="#/exam">Back to the simulator</a><a class="btn" href="#/review">Review mistakes</a></div></div></div></div>`
+          .join('')}</table>${examTimeHtml(qs.map((p, i) => ({ q: p.q, s: Math.round(spent[i] / 1000), ok: isCorrect(p, answers[i]) })), minutes * 60 / qs.length)}<div class="row" style="margin-top:.8rem"><a class="btn btn-primary" href="#/exam">Back to the simulator</a><a class="btn" href="#/exam/history">Exam history</a><a class="btn" href="#/review">Review mistakes</a><a class="btn" href="#/weak">Weak spots</a></div></div></div></div>`
       );
       $('#exSubmit').remove();
       timerEl.textContent = '';
