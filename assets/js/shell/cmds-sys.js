@@ -879,7 +879,7 @@ Number of days of warning before password expires\t: ${p[5] || 7}
       const val = (p) => ({ pid: p.pid, '%cpu': p.cpu, pcpu: p.cpu, '%mem': p.mem, pmem: p.mem, rss: p.rss, ni: p.ni, user: p.user, cmd: p.cmd, comm: comm(p) }[k]);
       list.sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * (desc ? -1 : 1));
     }
-    const time = (p) => (p.cpu > 5 ? '00:02:' + String(Math.floor(p.cpu * 2)).padStart(2, '0') : '00:00:0' + Math.min(9, Math.floor(p.cpu * 3)));
+    const time = (p) => (p.cpu > 5 ? '00:02:' + String(Math.min(59, Math.floor(p.cpu * 2))).padStart(2, '0') : '00:00:0' + Math.min(9, Math.floor(p.cpu * 3)));
     const forest = (rows, fmt) => {
       if (!o.forest && !o.H && !/f/.test(bsd)) return rows.map((p) => fmt(p, '')).join('');
       const byP = {};
@@ -968,7 +968,7 @@ MiB Swap:   4096.0 total,   4096.0 free,      0.0 used.   3126.6 avail Mem
     const s = sig;
     const job = sh.jobs.find((j) => j.pid === pid && j.end > Date.now());
     const proc = sh.state.procs.find((p) => p.pid === pid);
-    const isShell = pid === 1990 || (sh.userStack.length && pid === 2000 + sh.userStack.length);
+    const isShell = pid === 1990 || (sh.userStack.length && pid === 1980 + sh.userStack.length);
     if (!job && !proc && !isShell) return 'No such process';
     const owner = job ? job.user : proc ? proc.user : sh.username;
     if (sh.uid !== 0 && owner !== sh.username) return 'Operation not permitted';
@@ -2228,7 +2228,7 @@ Journal inode:            8
     const dot = s.active ? '\x1b[1;32m●\x1b[0m' : s.failed ? '\x1b[1;31m×\x1b[0m' : '○';
     c.out(`${dot} ${fn} - ${s.desc}
      Loaded: loaded (/lib/systemd/system/${fn}; ${s.masked ? 'masked' : s.static ? 'static' : s.enabled ? 'enabled' : 'disabled'}; preset: enabled)
-     Active: ${s.active ? '\x1b[1;32mactive (running)\x1b[0m' : s.failed ? '\x1b[1;31mfailed\x1b[0m (Result: signal)' : 'inactive (dead)'}${s.active ? ' since ' + SIM.strftime('%a %F', now.getTime(), c.sh.state.timezone) + ' 08:10:12 CET; 1h 31min ago' : ''}
+     Active: ${s.active ? '\x1b[1;32mactive (running)\x1b[0m' : s.failed ? `\x1b[1;31mfailed\x1b[0m (Result: ${s.badConf ? 'exit-code' : 'signal'})` : 'inactive (dead)'}${s.active ? ' since ' + SIM.strftime('%a %F', now.getTime(), c.sh.state.timezone) + ' 08:10:12 CET; 1h 31min ago' : ''}
 ${s.active && s.pid ? `   Main PID: ${s.pid} (${(s.bin || '').split(' ')[0].split('/').pop()})\n      Tasks: 1 (limit: 4613)\n     Memory: 4.8M\n        CPU: 112ms\n     CGroup: /system.slice/${fn}\n             └─${s.pid} ${s.bin}\n` : ''}
 ${SIM.strftime('%b %d', now.getTime(), c.sh.state.timezone)} 08:10:12 ${c.sh.state.hostname} systemd[1]: ${s.active ? 'Started' : 'Stopped'} ${fn} - ${s.desc}.
 `);
@@ -2294,6 +2294,24 @@ ${SIM.strftime('%b %d', now.getTime(), c.sh.state.timezone)} 08:10:12 ${c.sh.sta
           if (x.s.masked) {
             c.err(`Failed to start ${u}.service: Unit ${u}.service is masked.\n`);
             return 1;
+          }
+          // labs can attach a config check: the unit fails while the file matches the "bad" pattern
+          if (x.s.badConf) {
+            const txt = asRoot(sh, () => {
+              try {
+                return sh.fs.readFile(x.s.badConf.path, '/');
+              } catch (e) {
+                return '';
+              }
+            });
+            if (new RegExp(x.s.badConf.re, 'm').test(txt)) {
+              x.s.active = false;
+              x.s.failed = true;
+              SIM.journal(sh, x.name, x.s.badConf.msg || `Configuration error in ${x.s.badConf.path}`, 3);
+              SIM.journal(sh, 'systemd[1]', `${x.name}.service: Failed with result 'exit-code'.`, 3);
+              c.err(`Job for ${x.name}.service failed because the control process exited with error code.\nSee "systemctl status ${x.name}.service" and "journalctl -xeu ${x.name}.service" for details.\n`);
+              return 1;
+            }
           }
           if (sub === 'reload' && !x.s.active) {
             c.err(`Job for ${unitFile(x.name)} failed — unit is not active.\n`);
@@ -3053,13 +3071,13 @@ Please select a continent, ocean, "coord", or "TZ".
   };
   C.crontab = (c) => {
     const sh = c.sh;
-    const { o, rest } = getopt(c.args, 'lerui:', { list: 'l', edit: 'e', remove: 'r', 'user=': 'u' });
+    const { o, rest } = getopt(c.args, 'leru:i', { list: 'l', edit: 'e', remove: 'r', 'user=': 'u' });
     let user = sh.username;
     if (o.u) {
       if (sh.uid !== 0) return c.fail(`must be privileged to use -u`);
       user = o.u;
     }
-    if (!cronAllowed(c, user)) {
+    if (c.sh.uid !== 0 && !cronAllowed(c, user)) {
       c.err(`You (${user}) are not allowed to use this program (crontab)\nSee crontab(1) for more information\n`);
       return 1;
     }

@@ -1424,11 +1424,21 @@
     }
     if (o.c) c.out(`${fmt(total)}\ttotal\n`);
   };
+  // synthetic large files (registered in state.bigFiles by labs) count towards the root fs
+  const bigFilesK = (sh) =>
+    (sh.state.bigFiles || []).reduce((a, p) => {
+      const r = sh.fs.tryLookup(p, '/', false);
+      return a + (r && r.node.t === 'f' ? Math.round(SIM.fsize(r.node) / 1024) : 0);
+    }, 0);
+  const sizeToK = (s) => {
+    const m = /^([\d.]+)([KMGT])?/i.exec(s || '');
+    return m ? Math.round(+m[1] * { K: 1, M: 1024, G: 1048576, T: 1073741824 }[(m[2] || 'K').toUpperCase()] * 0.976) : 10218772;
+  };
   SIM.dfRows = function (sh) {
     const rows = [
       { fs: 'udev', type: 'devtmpfs', size: 1980000, used: 0, on: '/dev', inodes: 495000, iused: 420 },
       { fs: 'tmpfs', type: 'tmpfs', size: 402828, used: 1180, on: '/run', inodes: 503531, iused: 820 },
-      { fs: '/dev/sda2', type: 'ext4', size: 36508600, used: 9422120, on: '/', inodes: 2330624, iused: 229284 },
+      { fs: '/dev/sda2', type: 'ext4', size: 36508600, used: Math.min(36508600, 9422120 + bigFilesK(sh)), on: '/', inodes: 2330624, iused: 229284 },
       { fs: 'tmpfs', type: 'tmpfs', size: 2014124, used: 0, on: '/dev/shm', inodes: 503531, iused: 1 },
       { fs: '/dev/sda1', type: 'vfat', size: 523248, used: 5972, on: '/boot/efi', inodes: 0, iused: 0 },
       { fs: 'tmpfs', type: 'tmpfs', size: 1048576, used: 48, on: '/tmp', inodes: 503531, iused: 12 },
@@ -1436,7 +1446,7 @@
     ];
     for (const m of sh.fs.mounts) {
       const d = sh.fs.devices[m.dev] || {};
-      const sizeK = { '20G': 20511312, '10G': 10218772, '5G': 5074592, '9G': 9175040, '1G': 1048576 }[d.size] || 10218772;
+      const sizeK = sizeToK(d.size);
       rows.push({ fs: m.dev, type: m.fstype, size: sizeK, used: m.fstype === 'xfs' ? 104136 : 24 + 4 * Object.keys(sh.fs.node(m.root).ents).length, on: m.target, inodes: 655360, iused: 11 });
     }
     return rows;
@@ -1859,6 +1869,7 @@
       const d = r.node.data || '';
       r.node.data = n <= d.length ? d.slice(0, n) : d + '\0'.repeat(Math.min(n - d.length, 4096));
       if (n > 4096) r.node.fsize = n;
+      else delete r.node.fsize;
     }
   };
   C.install = (c) => {

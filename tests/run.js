@@ -15,6 +15,7 @@ for (const f of ['101', '102', '103', '104', '105', '106', '107', '108', '109', 
 for (const f of ['q101', 'q102', 'q103', 'q104', 'q105', 'q106', 'q107', 'q108', 'q109', 'q110']) if (require('fs').existsSync(path.join(ROOT, 'data', f + '.js'))) require(path.join(ROOT, 'data', f + '.js'));
 for (const f of ['de-101', 'de-102']) if (require('fs').existsSync(path.join(ROOT, 'data', f + '.js'))) require(path.join(ROOT, 'data', f + '.js'));
 require(path.join(ROOT, 'data', 'labs.js'));
+require(path.join(ROOT, 'data', 'scenarios.js'));
 
 const SIMS_IDS = {};
 for (const m of require('fs').readFileSync(path.join(ROOT, 'js', 'sims.js'), 'utf8').matchAll(/^\s{4}id: '([\w-]+)'/gm)) SIMS_IDS[m[1]] = true;
@@ -130,8 +131,9 @@ section('content');
 
 /* ---------- 3. labs ---------- */
 section('labs (reference solutions)');
-for (const [id, lab] of Object.entries(LPIC.labs)) {
-  ok(!!LPIC.byId[id], `lab ${id} belongs to an objective`);
+for (const [id, lab] of Object.entries(LPIC.labs).concat(Object.entries(LPIC.scenarios).map(([k, v]) => ['scenario:' + k, v]))) {
+  if (id.startsWith('scenario:')) ok(lab.obj.every((x) => LPIC.byId[x]) && lab.story, `${id} has a story and valid objectives`);
+  else ok(!!LPIC.byId[id], `lab ${id} belongs to an objective`);
   const sh = newShell();
   if (lab.setup) lab.setup(sh, LABH);
   const log = [];

@@ -19,6 +19,20 @@
       if (t.length > 1 && t.slice(1).indexOf(name) >= 0) return { ip: t[0], name: t[1], src: 'hosts' };
     }
     const n = name.replace(/\.$/, '');
+    // DNS only works if nsswitch uses it and a working name server is reachable
+    let conf = '';
+    let nss = 'hosts: files dns';
+    try {
+      conf = sh.fs.readFile('/etc/resolv.conf', '/');
+      nss = sh.fs.readFile('/etc/nsswitch.conf', '/');
+    } catch (e) {
+      /* missing files: keep defaults */
+    }
+    const hostsLine = (/^hosts:(.*)$/m.exec(nss) || [, ' files dns'])[1];
+    if (!/\b(dns|resolve)\b/.test(hostsLine)) return null;
+    const servers = [...conf.matchAll(/^\s*nameserver\s+(\S+)/gm)].map((m) => m[1]);
+    const good = ['192.168.56.1', '1.1.1.1', '1.0.0.1', '8.8.8.8', '8.8.4.4', '9.9.9.9', '127.0.0.53'];
+    if (!servers.some((ns) => good.indexOf(ns) >= 0 && SIM.hasRoute(sh, ns))) return null;
     const d = sh.state.dns[n] || sh.state.dns[n + '.example.com'];
     if (d) return { ip: d.find((x) => x.indexOf(':') < 0) || d[0], v6ip: d.find((x) => x.indexOf(':') >= 0), name: n, src: 'dns', all: d };
     return null;
@@ -30,6 +44,25 @@
     }
     for (const [k, v] of Object.entries(sh.state.dns)) if (v.indexOf(ip) >= 0) return k;
     return null;
+  };
+  // is there a route to ip? on-link networks of UP interfaces, otherwise a default route
+  const ip4n = (ip) => ip.split('.').reduce((a, b) => ((a << 8) + +b) >>> 0, 0);
+  const inNet = (ip, cidr) => {
+    const [net, len] = cidr.split('/');
+    const mask = +len === 0 ? 0 : (0xffffffff << (32 - +len)) >>> 0;
+    return (ip4n(ip) & mask) === (ip4n(net) & mask);
+  };
+  SIM.hasRoute = (sh, ip) => {
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip) || /^127\./.test(ip)) return true;
+    const st = sh.state.ip;
+    const up = (dev) => (st.links.find((l) => l.name === dev) || {}).state === 'UP';
+    for (const r of st.routes) {
+      if (r.dst === 'default') {
+        if (up(r.dev)) return true;
+      } else if (/\//.test(r.dst) && inNet(ip, r.dst) && up(r.dev)) return true;
+    }
+    for (const l of st.links) if (l.state === 'UP') for (const a of l.v4) if (inNet(ip, a.replace(/\.\d+\//, '.0/'))) return true;
+    return false;
   };
   const reachable = (ip) => /^(127\.|192\.168\.56\.|10\.0\.0\.|93\.184|65\.39|151\.101|139\.178|142\.250|1\.1\.1\.1|8\.8\.|::1|fe80|2606|2a00|162\.159)/.test(ip);
 
@@ -259,8 +292,12 @@
     const up = sh.state.ip.links.find((l) => l.name === 'enp0s3').state === 'UP';
     const count = o.c ? +o.c : 4;
     const size = o.s ? +o.s : 56;
-    c.out(`PING ${host} (${ip}) ${size}(${size + 28}) bytes of data.\n`);
     const local = /^127\.|^::1/.test(ip) || ip === '192.168.56.101';
+    if (!local && !SIM.hasRoute(sh, ip)) {
+      c.err('ping: connect: Network is unreachable\n');
+      return 2;
+    }
+    c.out(`PING ${host} (${ip}) ${size}(${size + 28}) bytes of data.\n`);
     const ok = local || (up && reachable(ip));
     let times = [];
     for (let i = 1; i <= count; i++) {

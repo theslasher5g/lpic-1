@@ -21,6 +21,7 @@
     objectives: [],
     byId: {},
     labs: {},
+    scenarios: {}, // troubleshooting labs (scenarios.js)
     add(o) {
       o.topic = o.id.split('.')[0];
       o.exam = +o.topic <= 104 ? '101' : '102';

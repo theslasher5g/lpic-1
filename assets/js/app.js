@@ -127,6 +127,7 @@
       <a class="nav-a ${cur.startsWith('#/weak') ? 'active' : ''}" href="#/weak">📉 <span class="grow">Weak spots</span></a>
       <a class="nav-a ${cur.startsWith('#/cheat') ? 'active' : ''}" href="#/cheat">📝 <span class="grow">Cheatsheets</span></a>
       <a class="nav-a ${cur.startsWith('#/cards') ? 'active' : ''}" href="#/cards">🃏 <span class="grow">Flashcards</span></a>
+      <a class="nav-a ${cur.startsWith('#/scenario') ? 'active' : ''}" href="#/scenarios">🛠️ <span class="grow">Troubleshooting</span></a>
       <a class="nav-a ${cur.startsWith('#/sims') || cur.startsWith('#/sim/') ? 'active' : ''}" href="#/sims">🧪 <span class="grow">Simulations</span></a>
       <a class="nav-a ${cur.startsWith('#/shell') ? 'active' : ''}" href="#/shell">⌨️ <span class="grow">Sandbox shell</span></a>
       <a class="nav-a ${cur.startsWith('#/commands') ? 'active' : ''}" href="#/commands">📖 <span class="grow">Command reference</span></a>
@@ -941,6 +942,22 @@
     show();
   });
 
+  /* =================== troubleshooting scenarios =================== */
+  const scenarioDone = (id) => Object.keys(Store.obj('sc:' + id).labs || {}).length;
+  route(/^\/scenarios$/, () => {
+    const list = Object.entries(LPIC.scenarios);
+    const lv = { easy: 'good', medium: 'w', hard: 'bad' };
+    view.innerHTML = `<h1>🛠️ Troubleshooting scenarios</h1><p class="muted">Something is broken — find the cause and fix it. Each scenario starts a fresh simulated system with a realistic fault and checks your fix automatically. Unlike the labs, the tasks lead you through a diagnosis: look, conclude, repair, verify.</p>
+      <div class="grid grid-auto">${list.map(([id, sc]) => { const d = scenarioDone(id); return `<a class="card sim-card" href="#/scenario/${id}"><div class="row"><span class="badge ${lv[sc.level] || ''}">${sc.level}</span><span class="spacer"></span><span class="ring ${d === sc.tasks.length ? 'done' : ''}" style="--p:${pct(d / sc.tasks.length)}"></span></div><h3>${esc(sc.title)}</h3><p>${md(sc.story.split('. ')[0] + '.')}</p><div class="chips" style="margin-top:auto">${sc.obj.map((x) => `<span class="badge w">${x}</span>`).join('')}<span class="badge">${d}/${sc.tasks.length} tasks</span></div></a>`; }).join('')}</div>`;
+  });
+  route(/^\/scenario\/([\w-]+)$/, (m) => {
+    const sc = LPIC.scenarios[m[1]];
+    if (!sc) return (view.innerHTML = '<h1>Unknown scenario</h1>');
+    view.innerHTML = `<div class="crumbs"><a href="#/scenarios">Troubleshooting</a> · ${sc.obj.map((x) => `<a href="#/obj/${x}">${x}</a>`).join(', ')}</div><h1>🛠️ ${esc(sc.title)}</h1><div id="scBody"></div>`;
+    const lab = Object.assign({}, sc, { intro: `**The problem:** ${sc.story}`, motd: 'Something is broken on this machine. Investigate with the usual tools — the tasks on the right guide you.' });
+    renderLab({ id: 'sc:' + m[1], title: sc.title }, lab, $('#scBody'));
+  });
+
   /* =================== cheatsheets =================== */
   // "> EXAM: …" callouts of an objective's wiki, as plain markdown strings
   function examNotes(o) {
@@ -1194,7 +1211,7 @@
         evaluate();
       },
     });
-    t.print(`\x1b[1;32mLab ${o.id}: ${lab.title || o.title}\x1b[0m\n\x1b[2m${(lab.motd || 'Work through the tasks on the right. Type "help" for shell help.').replace(/\n/g, '\n')}\x1b[0m\n\n`);
+    t.print(`\x1b[1;32m${o.id.startsWith("sc:") ? "Scenario" : "Lab " + o.id}: ${lab.title || o.title}\x1b[0m\n\x1b[2m${(lab.motd || 'Work through the tasks on the right. Type "help" for shell help.').replace(/\n/g, '\n')}\x1b[0m\n\n`);
     const done = new Set(Object.keys(st.labs || {}).map(Number));
     let showHints = false;
     const draw = () => {
