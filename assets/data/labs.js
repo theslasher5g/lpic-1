@@ -409,4 +409,186 @@
       { t: 'Create a detached signature for {{notes.txt}} and verify it.', hint: '{{gpg --detach-sign notes.txt}} then {{gpg --verify notes.txt.sig notes.txt}}', check: (sh, c, H) => H.isFile(sh, 'notes.txt.sig') && c.used(/gpg\s+--verify/), sol: ['gpg --detach-sign notes.txt', 'gpg --verify notes.txt.sig notes.txt'] },
     ],
   };
+  /* ---------------- 101.1 ---------------- */
+  L['101.1'] = {
+    title: 'Hardware and kernel modules',
+    intro: 'Inspect hardware and manage kernel modules. Module commands live in {{/usr/sbin}} — use {{sudo}}.',
+    tasks: [
+      { t: 'List the USB devices.', hint: '{{lsusb}}', check: (sh, c) => c.used(/^(sudo\s+)?lsusb/), sol: ['lsusb'] },
+      { t: 'List the PCI devices together with the kernel driver in use.', hint: '{{lspci -k}}', check: (sh, c) => c.used(/lspci\s+.*-[a-z]*k|lspci\s+-k/), sol: ['lspci -k'] },
+      { t: 'Show which interrupts (IRQs) are assigned.', hint: '{{cat /proc/interrupts}}', check: (sh, c) => c.used(/\/proc\/interrupts/), sol: ['cat /proc/interrupts'] },
+      { t: 'Load the kernel module **dummy**.', hint: '{{sudo modprobe dummy}}', check: (sh) => sh.state.modules.some((m) => m[0] === 'dummy'), sol: ['sudo modprobe dummy'] },
+      { t: 'Display information (description, license, parameters) about the module **e1000**.', hint: '{{sudo modinfo e1000}}', check: (sh, c) => c.used(/modinfo\s+e1000/), sol: ['sudo modinfo e1000'] },
+      { t: 'Unload the module **dummy** again.', hint: '{{sudo modprobe -r dummy}} (or {{sudo rmmod dummy}})', check: (sh, c) => !sh.state.modules.some((m) => m[0] === 'dummy') && c.used(/(modprobe\s+-r|rmmod)\s+dummy/), sol: ['sudo modprobe -r dummy'] },
+      { t: 'Prevent the module **bluetooth** from being loaded automatically (look at {{/etc/modprobe.d/blacklist.conf}} for the syntax).', hint: "{{echo 'blacklist bluetooth' | sudo tee /etc/modprobe.d/no-bluetooth.conf}}", check: (sh, c, H) => { const d = sh.fs.tryLookup('/etc/modprobe.d', '/'); if (!d) return false; return sh.fs.list(d.node).some((f) => /^\s*blacklist\s+bluetooth\b/m.test(H.read(sh, '/etc/modprobe.d/' + (f.name || f)) || '')); }, sol: ["echo 'blacklist bluetooth' | sudo tee /etc/modprobe.d/no-bluetooth.conf"] },
+    ],
+  };
+
+  /* ---------------- 101.2 ---------------- */
+  L['101.2'] = {
+    title: 'Boot process and boot messages',
+    intro: 'Find out how the system booted and what the kernel reported.',
+    tasks: [
+      { t: 'Show the kernel command line the running kernel was started with.', hint: '{{cat /proc/cmdline}}', check: (sh, c) => c.used(/\/proc\/cmdline/), sol: ['cat /proc/cmdline'] },
+      { t: 'Search the kernel ring buffer for messages about USB.', hint: '{{dmesg | grep -i usb}}', check: (sh, c) => c.used(/dmesg.*\|\s*grep.*usb/i), sol: ['dmesg | grep -i usb'] },
+      { t: 'Show only the kernel messages of the current boot from the systemd journal.', hint: '{{journalctl -k}} (or {{journalctl -b -k}})', check: (sh, c) => c.used(/journalctl\b.*(-k|--dmesg)/), sol: ['journalctl -k'] },
+      { t: 'List the recorded boots.', hint: '{{journalctl --list-boots}}', check: (sh, c) => c.used(/journalctl\s+--list-boots/), sol: ['journalctl --list-boots'] },
+      { t: 'Find out which units slowed down the last boot the most.', hint: '{{systemd-analyze blame}}', check: (sh, c) => c.used(/systemd-analyze\s+blame/), sol: ['systemd-analyze blame'] },
+      { t: 'Find out which init system runs as PID 1.', hint: '{{ps -p 1}} or {{cat /proc/1/cmdline}}', check: (sh, c) => c.used(/ps\s+.*-p\s*1\b|\/proc\/1\/(cmdline|comm)|ls\s+-l\s+\/sbin\/init|pstree/), sol: ['ps -p 1'] },
+    ],
+  };
+
+  /* ---------------- 102.1 ---------------- */
+  L['102.1'] = {
+    title: 'LVM on the second disk',
+    intro: 'Build an LVM stack on the empty disk {{/dev/sdb}}: PV → VG → LV → filesystem. All commands need {{sudo}}.',
+    tasks: [
+      { t: 'Initialize {{/dev/sdb}} as an LVM physical volume.', hint: '{{sudo pvcreate /dev/sdb}}', check: (sh) => !!((sh.state.lvm || {}).pvs || {})['/dev/sdb'], sol: ['sudo pvcreate /dev/sdb'] },
+      { t: 'Create the volume group **vg_data** on it.', hint: '{{sudo vgcreate vg_data /dev/sdb}}', check: (sh) => !!((sh.state.lvm || {}).vgs || {}).vg_data, sol: ['sudo vgcreate vg_data /dev/sdb'] },
+      { t: 'Create a 5 GiB logical volume **lv_home** in vg_data.', hint: '{{sudo lvcreate -L 5G -n lv_home vg_data}}', check: (sh) => { const l = ((sh.state.lvm || {}).lvs || {})['vg_data/lv_home']; return !!l && Math.abs(l.size - 5) < 0.01; }, sol: ['sudo lvcreate -L 5G -n lv_home vg_data'] },
+      { t: 'Create an ext4 filesystem on the logical volume.', hint: '{{sudo mkfs.ext4 /dev/vg_data/lv_home}}', check: (sh) => (sh.fs.devices['/dev/vg_data/lv_home'] || {}).fstype === 'ext4', sol: ['sudo mkfs.ext4 /dev/vg_data/lv_home'] },
+      { t: 'Mount it on {{/srv/home}}.', hint: '{{sudo mkdir -p /srv/home}} and {{sudo mount /dev/vg_data/lv_home /srv/home}}', check: (sh) => sh.fs.mounts.some((m) => m.target === '/srv/home'), sol: ['sudo mkdir -p /srv/home', 'sudo mount /dev/vg_data/lv_home /srv/home'] },
+      { t: 'Grow the logical volume by 2 GiB and resize the filesystem in the same step.', hint: '{{sudo lvextend -r -L +2G /dev/vg_data/lv_home}}', check: (sh) => { const l = ((sh.state.lvm || {}).lvs || {})['vg_data/lv_home']; return !!l && Math.abs(l.size - 7) < 0.01; }, sol: ['sudo lvextend -r -L +2G /dev/vg_data/lv_home'] },
+      { t: 'Show a summary of the volume group (size and free space).', hint: '{{sudo vgs}}', check: (sh, c) => c.used(/^sudo\s+(vgs|vgdisplay)/), sol: ['sudo vgs'] },
+    ],
+  };
+
+  /* ---------------- 102.2 ---------------- */
+  L['102.2'] = {
+    title: 'Configure GRUB 2',
+    intro: 'Change the boot menu timeout and the kernel parameters, then regenerate the configuration. Use {{sudo}}.',
+    tasks: [
+      { t: 'Display the GRUB defaults file.', hint: '{{cat /etc/default/grub}}', check: (sh, c) => c.used(/\/etc\/default\/grub/), sol: ['cat /etc/default/grub'] },
+      { t: 'Set the menu timeout to **10** seconds in {{/etc/default/grub}}.', hint: "{{sudo sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=10/' /etc/default/grub}}", check: (sh, c, H) => /^GRUB_TIMEOUT=10\s*$/m.test(H.read(sh, '/etc/default/grub') || ''), sol: ["sudo sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=10/' /etc/default/grub"] },
+      { t: 'Remove {{quiet}} from the default kernel parameters so all boot messages are shown.', hint: "{{sudo sed -i 's/quiet//' /etc/default/grub}}", check: (sh, c, H) => { const m = /^GRUB_CMDLINE_LINUX_DEFAULT="([^"]*)"/m.exec(H.read(sh, '/etc/default/grub') || ''); return !!m && !/\bquiet\b/.test(m[1]); }, sol: ["sudo sed -i 's/quiet//' /etc/default/grub"] },
+      { t: 'Regenerate {{/boot/grub/grub.cfg}}.', hint: '{{sudo update-grub}} (= {{sudo grub-mkconfig -o /boot/grub/grub.cfg}})', check: (sh, c, H) => /set timeout=10/.test(H.read(sh, '/boot/grub/grub.cfg') || ''), sol: ['sudo update-grub'] },
+      { t: 'List the menu entry titles in the generated configuration.', hint: "{{grep menuentry /boot/grub/grub.cfg}}", check: (sh, c) => c.used(/grep\b.*menuentry.*grub\.cfg/), sol: ['grep menuentry /boot/grub/grub.cfg'] },
+      { t: 'Show the UEFI boot entries in NVRAM.', hint: '{{sudo efibootmgr}}', check: (sh, c) => c.used(/efibootmgr/), sol: ['sudo efibootmgr'] },
+    ],
+  };
+
+  /* ---------------- 102.3 ---------------- */
+  L['102.3'] = {
+    title: 'Shared libraries',
+    intro: 'A vendor application keeps its libraries in {{/opt/vendor/lib}}.',
+    setup: (sh) => W(sh, '/opt/vendor/lib/libvendor.so.1', 'ELF 64-bit LSB shared object\n'),
+    tasks: [
+      { t: 'List the shared libraries needed by {{/usr/bin/ssh}}.', hint: '{{ldd /usr/bin/ssh}}', check: (sh, c) => c.used(/ldd\s+\/usr\/bin\/ssh/), sol: ['ldd /usr/bin/ssh'] },
+      { t: 'Search the library cache for **libz**.', hint: '{{sudo ldconfig -p | grep libz}}', check: (sh, c) => c.used(/ldconfig\s+-p.*libz/), sol: ['sudo ldconfig -p | grep libz'] },
+      { t: 'Add {{/opt/vendor/lib}} permanently to the library search path in a file {{/etc/ld.so.conf.d/vendor.conf}}.', hint: "{{echo /opt/vendor/lib | sudo tee /etc/ld.so.conf.d/vendor.conf}}", check: (sh, c, H) => /^\s*\/opt\/vendor\/lib\/?\s*$/m.test(H.read(sh, '/etc/ld.so.conf.d/vendor.conf') || ''), sol: ['echo /opt/vendor/lib | sudo tee /etc/ld.so.conf.d/vendor.conf'] },
+      { t: 'Rebuild the library cache.', hint: '{{sudo ldconfig}}', check: (sh, c) => c.log.some((l) => /^sudo\s+ldconfig(\s+-v)?\s*$/.test(l)), sol: ['sudo ldconfig'] },
+      { t: 'For testing only: add {{/opt/vendor/lib}} to the library path of the current shell with an environment variable.', hint: '{{export LD_LIBRARY_PATH=/opt/vendor/lib}}', check: (sh) => /(^|:)\/opt\/vendor\/lib\/?(:|$)/.test(sh.vars.LD_LIBRARY_PATH || '') && sh.exported.has('LD_LIBRARY_PATH'), sol: ['export LD_LIBRARY_PATH=/opt/vendor/lib'] },
+    ],
+  };
+
+  /* ---------------- 102.5 ---------------- */
+  L['102.5'] = {
+    title: 'RPM and YUM/DNF',
+    intro: 'This simulated host also has an RPM database (like a RHEL system). Practice the rpm query options and dnf.',
+    tasks: [
+      { t: 'List all installed RPM packages whose name contains **httpd**.', hint: '{{rpm -qa | grep httpd}}', check: (sh, c) => c.used(/rpm\s+-qa\b.*httpd/), sol: ['rpm -qa | grep httpd'] },
+      { t: 'Show the information (version, vendor, description) of the package **bash**.', hint: '{{rpm -qi bash}}', check: (sh, c) => c.used(/rpm\s+-qi\s+bash/), sol: ['rpm -qi bash'] },
+      { t: 'List the files of the package **httpd**.', hint: '{{rpm -ql httpd}}', check: (sh, c) => c.used(/rpm\s+-ql\s+httpd/), sol: ['rpm -ql httpd'] },
+      { t: 'Find out which package owns {{/usr/sbin/httpd}}.', hint: '{{rpm -qf /usr/sbin/httpd}}', check: (sh, c) => c.used(/rpm\s+-qf\s+\/usr\/sbin\/httpd/), sol: ['rpm -qf /usr/sbin/httpd'] },
+      { t: 'Search the repositories for **nginx**.', hint: '{{dnf search nginx}}', check: (sh, c) => c.used(/(dnf|yum)\s+search\s+nginx/), sol: ['dnf search nginx'] },
+      { t: 'Install **nginx** with dnf without being asked for confirmation.', hint: '{{sudo dnf install -y nginx}}', check: (sh, c) => c.used(/(dnf|yum)\s+install\s+.*nginx/) && c.used(/-y\b|--assumeyes/), sol: ['sudo dnf install -y nginx'] },
+      { t: 'Verify that it is now installed with rpm.', hint: '{{rpm -q nginx}}', check: (sh, c) => c.used(/rpm\s+-q\s+nginx/), sol: ['rpm -q nginx'] },
+    ],
+  };
+
+  /* ---------------- 102.6 ---------------- */
+  L['102.6'] = {
+    title: 'Linux as a virtualization guest',
+    intro: 'This machine is a clone of a VM template. Find out where it runs and regenerate its unique identifiers.',
+    tasks: [
+      { t: 'Detect the virtualization technology.', hint: '{{systemd-detect-virt}}', check: (sh, c) => c.used(/systemd-detect-virt|virt-what/), sol: ['systemd-detect-virt'] },
+      { t: 'Show the machine ID.', hint: '{{cat /etc/machine-id}}', check: (sh, c) => c.used(/\/etc\/machine-id/), sol: ['cat /etc/machine-id'] },
+      { t: 'Generate a new machine ID: empty {{/etc/machine-id}} and run {{systemd-machine-id-setup}}.', hint: '{{sudo truncate -s 0 /etc/machine-id}} then {{sudo systemd-machine-id-setup}}', check: (sh, c, H) => { const id = (H.read(sh, '/etc/machine-id') || '').trim(); return /^[0-9a-f]{32}$/.test(id) && id !== 'a3f1c2d4e5b60718293a4b5c6d7e8f90'; }, sol: ['sudo truncate -s 0 /etc/machine-id', 'sudo systemd-machine-id-setup'] },
+      { t: 'Delete the cloned SSH host keys and generate new ones.', hint: '{{sudo rm /etc/ssh/ssh_host_*}} then {{sudo ssh-keygen -A}}', check: (sh, c, H) => c.used(/rm\s+.*ssh_host/) && c.used(/ssh-keygen\s+-A/) && H.isFile(sh, '/etc/ssh/ssh_host_ed25519_key'), sol: ['sudo rm /etc/ssh/ssh_host_*', 'sudo ssh-keygen -A'] },
+      { t: 'Give the clone the host name **vm02**.', hint: '{{sudo hostnamectl set-hostname vm02}}', check: (sh, c, H) => /^vm02\s*$/.test(H.read(sh, '/etc/hostname') || ''), sol: ['sudo hostnamectl set-hostname vm02'] },
+    ],
+  };
+
+  /* ---------------- 103.6 ---------------- */
+  L['103.6'] = {
+    title: 'Process priorities',
+    intro: 'Start jobs with different niceness and change them while they run.',
+    tasks: [
+      { t: 'Start {{sleep 800}} in the background with nice value **10**.', hint: '{{nice -n 10 sleep 800 &}}', check: (sh) => jobsLike(sh, /sleep 800/).some((j) => j.ni === 10), sol: ['nice -n 10 sleep 800 &'] },
+      { t: 'Display PID, nice value and command of your processes.', hint: '{{ps -o pid,ni,cmd}} or {{ps -l}}', check: (sh, c) => c.used(/ps\s+.*(-o\s*\S*ni|-[a-z]*l)/), sol: ['ps -o pid,ni,cmd'] },
+      { t: 'As a normal user, make the job even "nicer": change its nice value to **15**.', hint: '{{renice -n 15 -p PID}} ({{$!}} holds the PID of the last background job)', check: (sh) => jobsLike(sh, /sleep 800/).some((j) => j.ni === 15), sol: ['renice -n 15 -p $!'] },
+      { t: 'Try to give it a **higher** priority (nice -5) as a normal user and observe the error, then do it with sudo.', hint: '{{renice -n -5 -p PID}} fails; {{sudo renice -n -5 -p PID}} works', check: (sh, c) => jobsLike(sh, /sleep 800/).some((j) => j.ni === -5) && c.log.some((l) => /^renice\s+(-n\s+)?-5/.test(l)), sol: ['renice -n -5 -p $!', 'sudo renice -n -5 -p $!'] },
+      { t: 'Show the kernel\'s static priority of process 1.', hint: '{{grep ^prio /proc/1/sched}}', check: (sh, c) => c.used(/\/proc\/1\/sched/), sol: ['grep ^prio /proc/1/sched'] },
+      { t: 'Show the processes with {{top}} (PR and NI columns) once.', hint: '{{top -n 1}} (in a real terminal: {{r}} renices, {{q}} quits)', check: (sh, c) => c.used(/^top\b/), sol: ['top -n 1'] },
+    ],
+  };
+
+  /* ---------------- 103.8 ---------------- */
+  L['103.8'] = {
+    title: 'Edit files with vi',
+    intro: 'Edit {{draft.txt}} with {{vi}} (or vim). Useful commands: {{dd}} delete line, {{o}} new line, {{:%s/old/new/g}} replace, {{:w file}} save as, {{:wq}} save and quit, {{u}} undo. The *vi trainer* simulation explains more.',
+    setup: (sh) => W(sh, '/home/student/draft.txt', 'My favourite colour is blue.\nDELETE ME\nThe colour of the sky changes.\nLast line\n'),
+    tasks: [
+      { t: 'Open {{draft.txt}} in vi.', hint: '{{vi draft.txt}}', check: (sh, c) => c.used(/^(vi|vim|view)\s+draft\.txt/), sol: ['vi draft.txt'] },
+      { t: 'Replace every "colour" with "color" (e.g. {{:%s/colour/color/g}}) and save.', hint: 'in vi: {{:%s/colour/color/g}} then {{:w}}', check: (sh, c, H) => { const s = H.read(sh, 'draft.txt') || ''; return /color/.test(s) && !/colour/.test(s); }, sol: ["sed -i 's/colour/color/g' draft.txt"] },
+      { t: 'Delete the line "DELETE ME" (cursor on the line, {{dd}}) and save.', hint: 'move with {{j}}/{{k}}, then {{dd}}, then {{:w}}', check: (sh, c, H) => { const s = H.read(sh, 'draft.txt'); return s !== null && !/DELETE ME/.test(s) && /Last line/.test(s); }, sol: ["sed -i '/DELETE ME/d' draft.txt"] },
+      { t: 'Add a new last line "The End" ({{G}} jumps to the last line, {{o}} opens a line below).', hint: '{{G}}, {{o}}, type The End, {{Esc}}, {{:w}}', check: (sh, c, H) => /The End\s*$/.test(H.read(sh, 'draft.txt') || ''), sol: ["echo 'The End' >> draft.txt"] },
+      { t: 'Save a copy of the file as {{draft.bak}} ({{:w draft.bak}}) and quit.', hint: '{{:w draft.bak}} then {{:q}}', check: (sh, c, H) => /The End/.test(H.read(sh, 'draft.bak') || ''), sol: ['cp draft.txt draft.bak'] },
+      { t: 'Your EDITOR is currently vim. Make **nano** the default editor for programs like {{crontab -e}} in your current shell.', hint: '{{export EDITOR=nano}}', check: (sh) => /^(\/usr\/bin\/|\/bin\/)?nano$/.test(sh.vars.EDITOR || '') && sh.exported.has('EDITOR'), sol: ['export EDITOR=nano'] },
+    ],
+  };
+
+  /* ---------------- 104.2 ---------------- */
+  L['104.2'] = {
+    title: 'Filesystem integrity',
+    intro: 'The partition {{/dev/sdb1}} contains an unmounted ext4 filesystem. Check usage, inspect and repair filesystems. Use {{sudo}}.',
+    setup: (sh) => {
+      sh.pushUser('root', false);
+      try {
+        sh.vars.PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+        sh.capture('parted -s /dev/sdb mklabel gpt mkpart data ext4 1MiB 10GiB; mkfs.ext4 -L data /dev/sdb1');
+      } finally {
+        sh.popUser();
+      }
+    },
+    tasks: [
+      { t: 'Show the disk usage of all mounted filesystems in human-readable form.', hint: '{{df -h}}', check: (sh, c) => c.used(/^df\s+-[a-zA-Z]*h/), sol: ['df -h'] },
+      { t: 'Show the inode usage of the root filesystem.', hint: '{{df -i /}}', check: (sh, c) => c.used(/^df\s+-[a-zA-Z]*i/), sol: ['df -i /'] },
+      { t: 'Show the total size of {{/var/log}}.', hint: '{{sudo du -sh /var/log}}', check: (sh, c) => c.used(/du\s+-[a-z]*s[a-z]*\s+\/var\/log/), sol: ['sudo du -sh /var/log'] },
+      { t: 'Check the filesystem on {{/dev/sdb1}} (it is not mounted).', hint: '{{sudo fsck /dev/sdb1}} (or {{sudo e2fsck -f /dev/sdb1}})', check: (sh, c) => c.used(/(fsck|e2fsck|fsck\.ext4)\s+.*\/dev\/sdb1/), sol: ['sudo fsck /dev/sdb1'] },
+      { t: 'Display the superblock information of {{/dev/sdb1}}.', hint: '{{sudo dumpe2fs -h /dev/sdb1}} or {{sudo tune2fs -l /dev/sdb1}}', check: (sh, c) => c.used(/(dumpe2fs|tune2fs\s+-l)\b.*\/dev\/sdb1/), sol: ['sudo dumpe2fs -h /dev/sdb1'] },
+      { t: 'Make the filesystem be checked after at most 30 mounts.', hint: '{{sudo tune2fs -c 30 /dev/sdb1}}', check: (sh, c) => c.used(/tune2fs\s+-c\s*30\s+\/dev\/sdb1/), sol: ['sudo tune2fs -c 30 /dev/sdb1'] },
+      { t: 'Change the label of {{/dev/sdb1}} to **archive**.', hint: '{{sudo e2label /dev/sdb1 archive}}', check: (sh) => (sh.fs.devices['/dev/sdb1'] || {}).label === 'archive', sol: ['sudo e2label /dev/sdb1 archive'] },
+    ],
+  };
+
+  /* ---------------- 106.1 ---------------- */
+  L['106.1'] = {
+    title: 'X11 configuration',
+    intro: 'Inspect the X session and change the keyboard layout in the X configuration.',
+    tasks: [
+      { t: 'Show which display your X clients use.', hint: '{{echo $DISPLAY}}', check: (sh, c) => c.used(/echo\s+.*\$\{?DISPLAY/), sol: ['echo $DISPLAY'] },
+      { t: 'Show the current screen resolution and the available modes.', hint: '{{xrandr}}', check: (sh, c) => c.used(/^xrandr/), sol: ['xrandr'] },
+      { t: 'Find the X configuration snippet that sets the keyboard layout in {{/etc/X11/xorg.conf.d/}}.', hint: '{{ls /etc/X11/xorg.conf.d/}} and {{cat /etc/X11/xorg.conf.d/00-keyboard.conf}}', check: (sh, c) => c.used(/xorg\.conf\.d\/00-keyboard\.conf/), sol: ['cat /etc/X11/xorg.conf.d/00-keyboard.conf'] },
+      { t: 'Change the layout in that file from **de** to **us**.', hint: "{{sudo sed -i 's/\"de\"/\"us\"/' /etc/X11/xorg.conf.d/00-keyboard.conf}}", check: (sh, c, H) => /Option\s+"XkbLayout"\s+"us"/.test(H.read(sh, '/etc/X11/xorg.conf.d/00-keyboard.conf') || ''), sol: ["sudo sed -i 's/\"de\"/\"us\"/' /etc/X11/xorg.conf.d/00-keyboard.conf"] },
+      { t: 'List the X authority cookies of your session.', hint: '{{xauth list}}', check: (sh, c) => c.used(/xauth\s+list/), sol: ['xauth list'] },
+      { t: 'Allow X clients from the host **fileserver** to use your display.', hint: '{{xhost +fileserver}}', check: (sh, c) => c.used(/xhost\s+\+fileserver/), sol: ['xhost +fileserver'] },
+      { t: 'Look at the X server log file for errors (lines with "(EE)").', hint: "{{grep EE /var/log/Xorg.0.log}}", check: (sh, c) => c.used(/Xorg\.0\.log/), sol: ['grep EE /var/log/Xorg.0.log'] },
+    ],
+  };
+
+  /* ---------------- 108.1 ---------------- */
+  L['108.1'] = {
+    title: 'System time and NTP',
+    intro: 'Check and set the clocks, the time zone and NTP synchronisation.',
+    tasks: [
+      { t: 'Show local time, UTC, RTC time, time zone and NTP status in one command.', hint: '{{timedatectl}}', check: (sh, c) => c.used(/^timedatectl\s*(status)?\s*$/), sol: ['timedatectl'] },
+      { t: 'Print the current UTC time with {{date}}.', hint: '{{date -u}}', check: (sh, c) => c.used(/^date\s+(-u|--utc)/), sol: ['date -u'] },
+      { t: 'Read the hardware clock.', hint: '{{sudo hwclock --show}}', check: (sh, c) => c.used(/hwclock(\s+(-r|--show))?\s*$/), sol: ['sudo hwclock --show'] },
+      { t: 'Show the NTP sources used by chronyd.', hint: '{{chronyc sources}}', check: (sh, c) => c.used(/chronyc\s+sources/), sol: ['chronyc sources'] },
+      { t: 'Set the time zone to **UTC**.', hint: '{{sudo timedatectl set-timezone UTC}}', check: (sh) => sh.state.timezone === 'UTC', sol: ['sudo timedatectl set-timezone UTC'] },
+      { t: 'Write the system time to the hardware clock.', hint: '{{sudo hwclock --systohc}}', check: (sh, c) => c.used(/hwclock\s+(--systohc|-w)/), sol: ['sudo hwclock --systohc'] },
+      { t: 'Find out which NTP pool servers are configured for chrony.', hint: '{{grep -E "^(pool|server)" /etc/chrony/chrony.conf}}', check: (sh, c) => c.used(/chrony\.conf/), sol: ['grep -E "^(pool|server)" /etc/chrony/chrony.conf'] },
+    ],
+  };
 })();

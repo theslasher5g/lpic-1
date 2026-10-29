@@ -640,7 +640,16 @@
     const home = sh.vars.HOME;
     if (o.A) {
       if (needRoot(c, 'ssh-keygen: generating new host keys: Permission denied')) return 1;
-      c.out('ssh-keygen: generating new host keys: RSA ECDSA ED25519 \n');
+      // like the real tool: only key types whose files are missing are generated
+      const made = [];
+      for (const [t, len] of [['rsa', 70], ['ecdsa', 60], ['ed25519', 50]]) {
+        const f = `/etc/ssh/ssh_host_${t}_key`;
+        if (c.fs.exists(f, '/')) continue;
+        made.push(t.toUpperCase());
+        c.fs.writeFile(f, '/', `-----BEGIN OPENSSH PRIVATE KEY-----\n${b64(len)}\n-----END OPENSSH PRIVATE KEY-----\n`).mode = 0o100600;
+        c.fs.writeFile(f + '.pub', '/', `${t === 'rsa' ? 'ssh-rsa' : t === 'ecdsa' ? 'ecdsa-sha2-nistp256' : 'ssh-ed25519'} AAAA${b64(len)} root@${sh.state.hostname}\n`).mode = 0o100644;
+      }
+      if (made.length) c.out(`ssh-keygen: generating new host keys: ${made.join(' ')} \n`);
       return 0;
     }
     if (o.R) {

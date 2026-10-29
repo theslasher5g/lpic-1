@@ -846,7 +846,7 @@ Number of days of warning before password expires\t: ${p[5] || 7}
     for (const j of sh.jobs) {
       if (j.end > now && !j.killed) list.push({ pid: j.pid, ppid: 1990, user: j.user, cmd: j.text.replace(/\s*&$/, '').replace(/^(nice(\s+-n)?\s+-?\d+|nohup|exec)\s+/, ''), ni: j.ni || 0, stat: j.stopped ? 'T' : j.ni > 0 ? 'SN' : j.ni < 0 ? 'S<' : 'S', tty: 'pts/0', cpu: 0.0, mem: 0.0, vsz: 7400, rss: 1000, start: new Date(j.start).toTimeString().slice(0, 5), job: j });
     }
-    if (sh.userStack.length) list.push({ pid: 2000 + sh.userStack.length, ppid: 1990, user: sh.username, cmd: '-bash', ni: 0, stat: 'S', tty: 'pts/0', cpu: 0, mem: 0.1, vsz: 8960, rss: 5200, start: '09:10' });
+    if (sh.userStack.length) list.push({ pid: 1980 + sh.userStack.length, ppid: 1990, user: sh.username, cmd: '-bash', ni: 0, stat: 'S', tty: 'pts/0', cpu: 0, mem: 0.1, vsz: 8960, rss: 5200, start: '09:10' });
     if (extra) list.push({ pid: sh.state.nextPid++, ppid: 1990, user: sh.username, cmd: extra, ni: 0, stat: 'R+', tty: 'pts/0', cpu: 0, mem: 0.1, vsz: 11200, rss: 4100, start: new Date().toTimeString().slice(0, 5) });
     return list.sort((a, b) => a.pid - b.pid);
   };
@@ -2750,6 +2750,20 @@ ${SIM.strftime('%b %d', now.getTime(), c.sh.state.timezone)} 08:10:12 ${c.sh.sta
     });
     if (o.s) c.err(`<${prio + 8}>${line}`);
   };
+  C['systemd-machine-id-setup'] = (c) => {
+    if (needRoot(c, 'Failed to open /etc/machine-id: Permission denied')) return 1;
+    let cur = '';
+    try {
+      cur = c.fs.readFile('/etc/machine-id', '/').trim();
+    } catch (e) {
+      /* missing */
+    }
+    if (/^[0-9a-f]{32}$/.test(cur)) return c.out(`/etc/machine-id already initialized with ${cur}.\n`);
+    const id = SIM.uuid().replace(/-/g, '');
+    c.fs.writeFile('/etc/machine-id', '/', id + '\n');
+    c.out(`Initializing machine ID from random generator.\n`);
+  };
+  sbin('systemd-machine-id-setup');
   C['systemd-cat'] = (c) => {
     const { o, rest } = getopt(c.args, 't:p:', { 'identifier=': 't', 'priority=': 'p' });
     const PR = { emerg: 0, alert: 1, crit: 2, err: 3, warning: 4, notice: 5, info: 6, debug: 7 };
