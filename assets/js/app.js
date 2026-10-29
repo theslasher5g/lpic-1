@@ -708,12 +708,13 @@
     const byW = alloc.slice().sort((a, b) => b.o.weight - a.o.weight);
     let guard = 0;
     while (sum !== total && guard++ < 500) {
-      for (const x of byW) {
+      // add to heavy objectives first; for short exams drop questions from light objectives first
+      for (const x of sum < total ? byW : byW.slice().reverse()) {
         if (sum === total) break;
         if (sum < total && x.n < x.o.quiz.length) {
           x.n++;
           sum++;
-        } else if (sum > total && x.n > 1) {
+        } else if (sum > total && x.n > 0) {
           x.n--;
           sum--;
         }
@@ -1288,6 +1289,10 @@
       <p><button class="btn btn-primary" id="openT">Open terminal (full height)</button></p>`;
     $('#openT').onclick = () => openDrawer(true);
     openDrawer(true);
+    // the full-height terminal belongs to this page: leaving it closes the drawer again
+    onLeave(() => {
+      if (document.body.classList.contains('drawer-max')) closeDrawer();
+    });
   });
 
   /* =================== command reference =================== */

@@ -2,18 +2,23 @@
 
 An interactive study site for the **LPIC-1 certification (version 5.0)**, covering exams **101-500** and **102-500**. It works both as a **wiki** for looking things up and as a **trainer** for testing yourself:
 
-- **Wiki for all 42 objectives** (101.1 – 110.3), with every term from the official objective list, worked examples, config file samples and "Exam focus" notes.
-- **559 practice questions** (single choice, multiple choice, fill-in-the-blank), each with an explanation.
+- **Wiki for all 42 objectives** (101.1 – 110.3), with every term from the official objective list, worked examples, config file samples and "Exam focus" notes. Weights and term lists are checked against the official LPI Learning Materials, and every objective page links to its Learning Materials chapter.
+- **1001 practice questions** (single choice, multiple choice, fill-in-the-blank, scenarios), each with an English explanation.
+- **Optional German help**: a German explanation for every question and a German summary on every objective page (*Settings → Language*). The questions themselves stay in English, as in the exam.
 - **Exam simulator**: 60 questions in 90 minutes, weighted by objective weight like the real exam, with 65 % as the pass mark (an approximation of LPI's scaled 500/800 score).
+- **Exam analysis**: results per topic, time per question compared with the exam budget, and an exam history with a score trend chart.
+- **Weak spots**: your weakest questions (practise the top 20 in one click), the commands and files you miss most, accuracy per topic, and objectives ranked by priority (exam weight × what is still missing).
 - **Spaced repetition** (Leitner boxes) in a *Review* queue, plus **flashcards** for commands and questions.
+- **Printable cheatsheets** per topic or per exam: commands with their key options, files, terms and all exam notes, in a two-column print layout (save as PDF).
 - **Simulated Debian shell** running entirely in the browser, with about 300 commands, a virtual filesystem with permissions and links, users and sudo, systemd, apt/dpkg/rpm, disks and LVM, networking, ssh/gpg, cron/at, CUPS, a mail queue, the journal, plus vi and nano editors.
   - Every `$ command` in the wiki can be clicked to run it in the sandbox (lines starting with `#` run through `sudo`).
   - The sandbox keeps its state between visits (*Settings → reset* starts over).
-- **27 hands-on labs**: tasks are checked automatically as you type commands.
+- **39 hands-on labs**: tasks are checked automatically as you type commands.
+- **7 troubleshooting scenarios**: a fresh system with a realistic fault (full disk, web server that fails to start, no network or DNS, locked user, silent cron job, broken shared directory, runaway process). The tasks lead you from diagnosis to repair and verification.
 - **16 simulations**: chmod/umask calculators, a regex tester, a cron builder, the boot sequence, runlevels ↔ targets, a vi trainer, a subnet calculator, a ports drill, passwd/shadow fields, links, MBR/GPT partitions, redirection, bash startup files, package commands across distributions, and an fstab builder.
 - **Progress tracking**: mastery per objective (studied + questions + lab), exam readiness weighted by objective weight, a streak counter, exam history and personal notes.
 
-All content is in English. No external libraries and no internet connection are needed.
+The content is in English, with optional German explanations. No external libraries and no internet connection are needed.
 
 ## Run with Docker (recommended)
 
@@ -78,7 +83,14 @@ If `node:sqlite` is not available, the server falls back to a JSON file.
 npm test
 ```
 
-The tests cover the shell simulator, all content (every objective present, exam weights adding up to 60 per exam, valid answer indices), each lab being solvable with its reference solution, and every example command in the wiki running without an internal error.
+The tests cover the shell simulator, all content (every objective present, exam weights adding up to 60 per exam, valid answer indices, unique questions, German explanations), each lab and scenario being solvable with its reference solution, and every example command in the wiki running without an internal error.
+
+Browser tests (optional, need Playwright with Chromium) start the server with a temporary database and click through every page, a quiz, a lab, a scenario, an exam and the terminal:
+
+```bash
+npm install --no-save playwright && npx playwright install chromium
+npm run test:ui
+```
 
 ## Project layout
 
@@ -90,9 +102,13 @@ assets/js/app.js           router, dashboard, wiki, quiz & exam engine, labs, fl
 assets/js/store.js         progress store (localStorage + server sync, spaced repetition)
 assets/js/sims.js          interactive simulations
 assets/data/101.js … 110.js  wiki + questions per topic
+assets/data/q101.js … q110.js  additional questions
+assets/data/de-101.js, de-102.js  German explanations and summaries
+assets/data/scenarios.js   troubleshooting scenarios
 assets/data/labs.js        hands-on labs
 server.js                  zero-dependency Node server + SQLite persistence
 tests/run.js               test suite
+tests/ui.js                browser smoke tests (Playwright)
 ```
 
 > The content follows the public LPIC-1 v5.0 objectives (https://wiki.lpi.org). This is an independent study aid, not affiliated with or endorsed by the Linux Professional Institute.

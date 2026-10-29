@@ -304,7 +304,7 @@
       const t = local ? 0.03 + Math.random() * 0.03 : ip.startsWith('192.168.56.') ? 0.4 + Math.random() * 0.6 : 11 + Math.random() * 9;
       if (ok) {
         times.push(t);
-        if (!o.q) c.out(`${size + 8} bytes from ${r.src === 'dns' && !o.n ? r.name + ' (' + ip + ')' : ip}: icmp_seq=${i} ttl=${local ? 64 : 56} time=${t.toFixed(t < 1 ? 3 : 1)} ms\n`);
+        if (!o.q) c.out(`${size + 8} bytes from ${r.src === 'dns' && !o.n ? r.name + ' (' + ip + ')' : ip}: icmp_seq=${i} ttl=${local || ip.startsWith("192.168.56.") ? 64 : 56} time=${t.toFixed(t < 1 ? 3 : 1)} ms\n`);
       }
     }
     if (!o.c) c.err(note('(ping runs until Ctrl+C on Linux — the simulator stops after 4 packets; use -c N)'));
@@ -1030,7 +1030,12 @@
       return 0;
     }
     if (has('--gen-revoke', '--generate-revocation')) {
-      c.out(`-----BEGIN PGP PUBLIC KEY BLOCK-----\nComment: This is a revocation certificate\n\niQG2BCAB${b64(56)}\n-----END PGP PUBLIC KEY BLOCK-----\n`);
+      const cert = `-----BEGIN PGP PUBLIC KEY BLOCK-----\nComment: This is a revocation certificate\n\niQG2BCAB${b64(56)}\n-----END PGP PUBLIC KEY BLOCK-----\n`;
+      const out = val('-o') || val('--output');
+      if (out) {
+        c.fs.writeFile(out, sh.cwd, cert);
+        c.err('Revocation certificate created.\n\nPlease move it to a medium which you can hide away; if Mallory gets\naccess to this certificate he can use it to make your key unusable.\n');
+      } else c.out(cert);
       return 0;
     }
     c.out(note('(gpg options: --gen-key, --list-keys, --export -a, --import, -e -r user file, -d file.gpg, -c file, --sign, --clearsign, --verify)'));
