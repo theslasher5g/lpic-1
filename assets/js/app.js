@@ -452,10 +452,13 @@
       <div class="card" style="margin-bottom:1.2rem"><b>Description</b><p style="margin:.3rem 0 .8rem">${md(o.desc)}</p>
         <b>Key knowledge areas</b><ul class="ka">${o.knowledge.map((k) => `<li>${md(k)}</li>`).join('')}</ul>
         <b>Terms and utilities</b><div class="chips" style="margin-top:.4rem">${o.terms.map((t) => `<span class="chip ${knownTerm(t) ? 'known' : ''}" data-term="${esc(t)}" title="${knownTerm(t) ? 'show manual page' : t.startsWith('/') || t.startsWith('~') ? 'show in the sandbox' : 'search'}">${esc(t)}</span>`).join('')}</div></div>
+      ${deOn() && LPIC.deSummary[o.id] ? `<details class="card de-sum" lang="de" ${Store.data.settings.deOpen === false ? '' : 'open'}><summary><span class="de-flag">DE</span> Kurzfassung auf Deutsch</summary>${MD.render(LPIC.deSummary[o.id]).html}</details>` : ''}
       ${r.toc.length > 2 ? `<div class="card toc">${r.toc.map((x) => `<a href="#/obj/${o.id}" data-anchor="${x.id}">${esc(x.text)}</a>`).join('')}</div>` : ''}
       ${r.html}
       <div class="card" style="margin-top:2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>Done reading?</b><div class="muted" style="font-size:.88rem">Mark the objective as studied, then test yourself.</div></div>
         <button class="btn ${st.read ? '' : 'btn-primary'}" id="readBtn">${st.read ? '✓ Studied (undo)' : '✓ Mark as studied'}</button><a class="btn" href="#/obj/${o.id}/quiz">Take the quiz →</a>${LPIC.labs[o.id] ? `<a class="btn" href="#/obj/${o.id}/lab">Open the lab →</a>` : ''}</div></div>`;
+    const ds = $('.de-sum', body);
+    if (ds) ds.addEventListener('toggle', () => Store.setSetting('deOpen', ds.open));
     $('#readBtn').onclick = () => {
       Store.setRead(o.id, !st.read);
       render();
@@ -489,6 +492,9 @@
   /* =================== quiz engine =================== */
   const qType = (q) => (q.fill ? 'fill' : Array.isArray(q.a) ? 'multi' : 'single');
   const norm = (s) => String(s).trim().replace(/\s+/g, ' ');
+  // optional German explanation (Settings → "Deutsche Erklärungen")
+  const deOn = () => Store.data.settings.de !== false;
+  const deText = (q, cls = '') => (deOn() && q.de ? `<div class="de-ex ${cls}" lang="de"><span class="de-flag" title="Deutsch">DE</span> ${md(q.de)}</div>` : '');
   function prepare(q) {
     const t = qType(q);
     if (t === 'fill') return { q, t, order: null };
@@ -559,7 +565,7 @@
       const ok = rev && isCorrect(p, answers[cur]);
       let h = `<div class="bar" style="margin-bottom:.8rem"><span style="width:${pct(checked.filter(Boolean).length / items.length)}%"></span></div>` + questionHtml(p, cur, items.length, answers[cur], rev);
       if (rev)
-        h += `<div class="feedback ${ok ? 'ok' : 'no'}"><b class="res">${ok ? '✓ Correct' : '✗ Not quite'}</b>${ok ? '' : `<div><b>Correct answer:</b> ${correctText(p)}</div>`}${p.q.e ? `<div style="margin-top:.4rem">${md(p.q.e)}</div>` : ''}<div class="row" style="margin-top:.5rem"><a class="btn btn-sm btn-ghost" href="#/obj/${p.q.obj}">📚 Read ${p.q.obj}</a></div></div>`;
+        h += `<div class="feedback ${ok ? 'ok' : 'no'}"><b class="res">${ok ? '✓ Correct' : '✗ Not quite'}</b>${ok ? '' : `<div><b>Correct answer:</b> ${correctText(p)}</div>`}${p.q.e ? `<div style="margin-top:.4rem">${md(p.q.e)}</div>` : ''}${deText(p.q)}<div class="row" style="margin-top:.5rem"><a class="btn btn-sm btn-ghost" href="#/obj/${p.q.obj}">📚 Read ${p.q.obj}</a></div></div>`;
       h += `<div class="q-actions">${cur > 0 ? '<button class="btn" id="qPrev">← Back</button>' : ''}<span class="spacer"></span>${rev ? (cur < items.length - 1 ? '<button class="btn btn-primary" id="qNext">Next →</button>' : '<button class="btn btn-primary" id="qDone">See results</button>') : '<button class="btn" id="qSkip">Skip</button><button class="btn btn-primary" id="qCheck">Check answer</button>'}</div>`;
       card.innerHTML = h;
       const inp = $('#fillIn', card);
@@ -631,7 +637,7 @@
       const wrong = items.filter((p, i) => checked[i] && !isCorrect(p, answers[i])).map((p) => p.q);
       card.innerHTML = `<div class="result-hero"><div class="big-ring" style="--p:${pct(ok / items.length)}"><span>${pct(ok / items.length)}%<small>${ok}/${items.length}</small></span></div><div><h2 style="margin-top:0">${esc(opts.title || 'Quiz')} finished</h2><p class="muted">${done} of ${items.length} answered · ${ok} correct${wrong.length ? ` · ${wrong.length} to review` : ''}</p>
         <div class="row">${wrong.length ? '<button class="btn btn-primary" id="qRetryWrong">Retry the wrong ones</button>' : ''}<button class="btn" id="qAgain">Restart (shuffled)</button>${opts.backHref ? `<a class="btn" href="${opts.backHref}">Back</a>` : ''}</div></div></div>
-        ${wrong.length ? `<h3>Review</h3>${wrong.map((q) => `<div class="feedback no" style="margin:.5rem 0"><div>${md(q.q)}</div><div style="margin-top:.3rem"><b>Answer:</b> ${correctText(prepare(q))}</div>${q.e ? `<div class="muted" style="margin-top:.3rem">${md(q.e)}</div>` : ''}</div>`).join('')}` : ''}`;
+        ${wrong.length ? `<h3>Review</h3>${wrong.map((q) => `<div class="feedback no" style="margin:.5rem 0"><div>${md(q.q)}</div><div style="margin-top:.3rem"><b>Answer:</b> ${correctText(prepare(q))}</div>${q.e ? `<div class="muted" style="margin-top:.3rem">${md(q.e)}</div>` : ''}${deText(q)}</div>`).join('')}` : ''}`;
       const a = $('#qAgain', card);
       if (a) a.onclick = () => runQuiz(root, questions, Object.assign({}, opts, { shuffle: true }));
       const r = $('#qRetryWrong', card);
@@ -781,7 +787,7 @@
       let h = questionHtml(p, cur, qs.length, answers[cur], submitted);
       if (submitted) {
         const ok = isCorrect(p, answers[cur]);
-        h += `<div class="feedback ${ok ? 'ok' : 'no'}"><b class="res">${ok ? '✓ Correct' : '✗ Wrong'}</b>${ok ? '' : `<div><b>Correct answer:</b> ${correctText(p)}</div>`}${p.q.e ? `<div style="margin-top:.4rem">${md(p.q.e)}</div>` : ''}</div>`;
+        h += `<div class="feedback ${ok ? 'ok' : 'no'}"><b class="res">${ok ? '✓ Correct' : '✗ Wrong'}</b>${ok ? '' : `<div><b>Correct answer:</b> ${correctText(p)}</div>`}${p.q.e ? `<div style="margin-top:.4rem">${md(p.q.e)}</div>` : ''}${deText(p.q)}</div>`;
       }
       h += `<div class="q-actions"><button class="btn" id="exPrev" ${cur === 0 ? 'disabled' : ''}>← Previous</button>${submitted ? '' : `<button class="btn" id="exFlag">${flags[cur] ? '⚑ Unflag' : '⚐ Flag for review'}</button>`}<span class="spacer"></span><button class="btn btn-primary" id="exNext" ${cur === qs.length - 1 ? 'disabled' : ''}>Next →</button></div>`;
       $('#exCard').innerHTML = h;
@@ -892,7 +898,7 @@
         }
     } else {
       const qs = scopeQuestions(scope);
-      cards = qs.map((q) => ({ front: md(q.q) + (q.o ? `<ol type="A" style="font-size:.9rem;font-weight:400;text-align:left">${q.o.map((x) => `<li>${md(x)}</li>`).join('')}</ol>` : ''), back: correctText(prepare(q)) + (q.e ? `<div class="muted" style="margin-top:.6rem;font-size:.9rem;font-weight:400">${md(q.e)}</div>` : ''), obj: q.obj, id: q.id }));
+      cards = qs.map((q) => ({ front: md(q.q) + (q.o ? `<ol type="A" style="font-size:.9rem;font-weight:400;text-align:left">${q.o.map((x) => `<li>${md(x)}</li>`).join('')}</ol>` : ''), back: correctText(prepare(q)) + (q.e ? `<div class="muted" style="margin-top:.6rem;font-size:.9rem;font-weight:400">${md(q.e)}</div>` : '') + deText(q, 'small'), obj: q.obj, id: q.id }));
     }
     cards = shuffle(cards);
     let i = 0;
@@ -1143,10 +1149,16 @@
     view.innerHTML = `<h1>⚙️ Settings & backup</h1>
       <div class="card" style="max-width:720px"><h3 style="margin-top:0">Storage</h3><p>${Store.server ? '✅ Connected to the LPIC-1 Trainer server — progress and sandbox are stored in its <b>SQLite database</b> (Docker volume <code>lpic1-data</code>) and cached in this browser.' : 'ℹ️ No server detected — progress is stored in this browser only (localStorage). Start the Docker container (see README) to keep it in a persistent database.'}</p><p class="muted">Approx. ${used} KB of data.</p>
       <h3>Theme</h3><div class="row"><select class="inp" id="setTheme"><option value="auto">follow system</option><option value="dark">dark</option><option value="light">light</option></select></div>
+      <h3>Language</h3><label class="row" style="gap:.5rem;cursor:pointer"><input type="checkbox" id="setDe"> <span>Show <b>German explanations</b> for questions and a <b>German summary</b> on every objective page (Deutsche Erklärungen und Kurzfassungen anzeigen). Questions stay in English like in the exam.</span></label>
       <h3>Backup</h3><div class="row"><button class="btn" id="exp">⬇ Export progress (JSON)</button><label class="btn">⬆ Import<input type="file" id="imp" accept="application/json" hidden></label></div>
       <h3>Reset</h3><div class="row"><button class="btn btn-danger" id="rstSandbox">Reset sandbox filesystem</button><button class="btn btn-danger" id="rstAll">Reset all progress</button></div></div>
       <div class="card" style="max-width:720px;margin-top:1rem"><h3 style="margin-top:0">Keyboard shortcuts</h3><table><tr><td><kbd>/</kbd></td><td>search</td></tr><tr><td><kbd>Ctrl</kbd>+<kbd>\`</kbd> or <kbd>Alt</kbd>+<kbd>T</kbd></td><td>toggle the sandbox terminal</td></tr><tr><td><kbd>1</kbd>–<kbd>5</kbd> / <kbd>A</kbd>–<kbd>E</kbd>, <kbd>Enter</kbd></td><td>answer / check / next in quizzes</td></tr><tr><td><kbd>Space</kbd>, <kbd>←</kbd>/<kbd>→</kbd></td><td>flip / rate flashcards</td></tr><tr><td><kbd>Tab</kbd>, <kbd>↑</kbd>/<kbd>↓</kbd>, <kbd>Ctrl</kbd>+<kbd>R</kbd>, <kbd>Ctrl</kbd>+<kbd>L</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>terminal: completion, history, reverse search, clear, cancel</td></tr></table></div>`;
     $('#setTheme').value = Store.data.settings.theme || 'auto';
+    $('#setDe').checked = deOn();
+    $('#setDe').onchange = (e) => {
+      Store.setSetting('de', e.target.checked);
+      toast(e.target.checked ? 'Deutsche Erklärungen an' : 'German explanations off');
+    };
     $('#setTheme').onchange = (e) => {
       Store.setSetting('theme', e.target.value);
       applyTheme();

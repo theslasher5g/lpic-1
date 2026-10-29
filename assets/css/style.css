@@ -1759,3 +1759,36 @@ textarea.notes {
 .badge:empty {
   display: none;
 }
+
+/* German explanations and summaries */
+.de-flag {
+  display: inline-block;
+  font: 600 0.68rem/1 var(--sans);
+  letter-spacing: 0.04em;
+  padding: 0.18rem 0.35rem;
+  border-radius: 4px;
+  background: var(--info-bg);
+  color: var(--blue);
+  vertical-align: 0.1em;
+  margin-right: 0.15rem;
+}
+.de-ex {
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px dashed var(--line);
+  color: var(--fg2);
+}
+.de-ex.small {
+  font-size: 0.88rem;
+  font-weight: 400;
+}
+.de-sum {
+  margin-bottom: 1.2rem;
+}
+.de-sum summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.de-sum ul {
+  margin: 0.6rem 0 0;
+}

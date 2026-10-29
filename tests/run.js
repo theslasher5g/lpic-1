@@ -13,6 +13,7 @@ require(path.join(ROOT, 'js', 'labh.js'));
 require(path.join(ROOT, 'data', 'topics.js'));
 for (const f of ['101', '102', '103', '104', '105', '106', '107', '108', '109', '110']) require(path.join(ROOT, 'data', f + '.js'));
 for (const f of ['q101', 'q102', 'q103', 'q104', 'q105', 'q106', 'q107', 'q108', 'q109', 'q110']) if (require('fs').existsSync(path.join(ROOT, 'data', f + '.js'))) require(path.join(ROOT, 'data', f + '.js'));
+for (const f of ['de-101', 'de-102']) if (require('fs').existsSync(path.join(ROOT, 'data', f + '.js'))) require(path.join(ROOT, 'data', f + '.js'));
 require(path.join(ROOT, 'data', 'labs.js'));
 
 const SIMS_IDS = {};
@@ -116,6 +117,8 @@ section('content');
     ok((src.match(/^~~~/gm) || []).length % 2 === 0, `${o.id} wiki has balanced ~~~ fences`);
     ok((src.match(/\{\{/g) || []).length === (src.match(/\}\}/g) || []).length, `${o.id} wiki has balanced {{ }}`);
   }
+  for (const q of LPIC.allQuestions()) ok(typeof q.de === 'string' && q.de.length > 10, `${q.id} has a German explanation`);
+  for (const o of objs) ok(typeof LPIC.deSummary[o.id] === 'string' && LPIC.deSummary[o.id].length > 100, `${o.id} has a German summary`);
   const seenText = new Map();
   for (const q of LPIC.allQuestions()) {
     const k = q.q.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

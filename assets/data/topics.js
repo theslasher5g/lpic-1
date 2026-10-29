@@ -35,6 +35,19 @@
       const start = o.quiz.length;
       qs.forEach((q, i) => o.quiz.push(Object.assign({ id: id + '#' + (start + i), obj: id }, q)));
     },
+    // German explanations ({ 'obj#n': text }) and German summaries per objective
+    deSummary: {},
+    addDe(map) {
+      for (const [qid, text] of Object.entries(map)) {
+        const [oid, n] = qid.split('#');
+        const q = this.byId[oid] && this.byId[oid].quiz[+n];
+        if (!q) throw new Error('unknown question ' + qid);
+        q.de = text;
+      }
+    },
+    addSummaryDe(map) {
+      Object.assign(this.deSummary, map);
+    },
     sorted() {
       const k = (id) => id.split('.').map((x) => x.padStart(3, '0')).join('.');
       return this.objectives.slice().sort((a, b) => (k(a.id) < k(b.id) ? -1 : 1));
