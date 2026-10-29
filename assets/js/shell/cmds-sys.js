@@ -3290,9 +3290,6 @@ Please select a continent, ocean, "coord", or "TZ".
     else c.out('\x1b[H\x1b[2J');
   };
   C.reset = C.clear;
-  C['reset-sandbox'] = (c) => {
-    if (c.sh.onEvent) c.sh.onEvent('resetSandbox');
-  };
   C.expr = (c) => {
     const a = c.args.slice();
     let p = 0;

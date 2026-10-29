@@ -1528,6 +1528,11 @@
           return 127;
         }
         io.err(`${name}: command not found\n`);
+        // the system directories are gone (e.g. after "rm -rf /*"): tell the user how to recover
+        if (SIM.cmds[name] && !this.fs.tryLookup('/usr/bin/ls', '/')) {
+          io.err('\x1b[33m(the system programs in /usr/bin were deleted — this is what rm -rf / does to a real machine. Type "reset-sandbox" to restore the factory filesystem.)\x1b[0m\n');
+          return 127;
+        }
         if (SIM.suggest) {
           const s = SIM.suggest(name);
           if (s) io.err(`\x1b[2m${s}\x1b[0m\n`);

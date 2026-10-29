@@ -82,6 +82,17 @@ section('shell simulator');
   T('systemd-cat -t unit-test echo journal-ok; journalctl -t unit-test', /unit-test: journal-ok/);
   T('getent ahosts localhost | head -1', /^127\.0\.0\.1\s+STREAM localhost/);
   ok(out('history | tail -1') !== undefined, 'history works');
+  {
+    // after "rm -rf /*" every program is gone, but reset-sandbox (a builtin) must still work
+    const broken = newShell();
+    let ev = null;
+    broken.onEvent = (t) => (ev = t);
+    broken.capture('sudo rm -rf /*');
+    const r = broken.capture('ls');
+    ok(r.status === 127 && /reset-sandbox/.test(r.err), 'after rm -rf /* a hint points to reset-sandbox', r.err);
+    broken.capture('reset-sandbox');
+    ok(ev === 'resetSandbox', 'reset-sandbox works after rm -rf /*');
+  }
 }
 
 /* ---------- 2. content ---------- */

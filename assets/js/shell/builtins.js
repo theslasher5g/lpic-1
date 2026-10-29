@@ -72,6 +72,11 @@
 
   const B = (SIM.builtins = {});
 
+  // a builtin (not a file in /usr/bin), so it still works after "rm -rf /*"
+  B['reset-sandbox'] = (c) => {
+    if (c.sh.onEvent) c.sh.onEvent('resetSandbox');
+    else c.err('reset-sandbox: only available in the sandbox terminal\n');
+  };
   B.cd = (c) => {
     const sh = c.sh;
     let args = c.args.filter((a) => a !== '-L' && a !== '-P');
