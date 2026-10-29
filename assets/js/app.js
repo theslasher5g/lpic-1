@@ -124,6 +124,7 @@
       <a class="nav-a ${cur.startsWith('#/quiz') ? 'active' : ''}" href="#/quiz">❓ <span class="grow">Quiz center</span></a>
       <a class="nav-a ${cur.startsWith('#/exam') ? 'active' : ''}" href="#/exam">⏱️ <span class="grow">Exam simulator</span></a>
       <a class="nav-a ${cur.startsWith('#/review') ? 'active' : ''}" href="#/review">🔁 <span class="grow">Review</span><span class="badge warn" id="dueBadge"></span></a>
+      <a class="nav-a ${cur.startsWith('#/weak') ? 'active' : ''}" href="#/weak">📉 <span class="grow">Weak spots</span></a>
       <a class="nav-a ${cur.startsWith('#/cards') ? 'active' : ''}" href="#/cards">🃏 <span class="grow">Flashcards</span></a>
       <a class="nav-a ${cur.startsWith('#/sims') || cur.startsWith('#/sim/') ? 'active' : ''}" href="#/sims">🧪 <span class="grow">Simulations</span></a>
       <a class="nav-a ${cur.startsWith('#/shell') ? 'active' : ''}" href="#/shell">⌨️ <span class="grow">Sandbox shell</span></a>
@@ -867,6 +868,98 @@
     };
     $('#exSubmit').onclick = submit;
     show();
+  });
+
+  /* =================== weak spots =================== */
+  // Laplace-smoothed error rate, raised when the last answer was wrong and lowered by Leitner box
+  function weakness(qs) {
+    const s = Store.data.questions[qs.id];
+    if (!s || !s.n) return null;
+    return (s.n - s.ok + 1) / (s.n + 2) + (s.last === false ? 0.35 : 0) - (s.box || 0) * 0.06;
+  }
+  function weakQuestions(limit) {
+    return LPIC.allQuestions()
+      .map((q) => ({ q, w: weakness(q) }))
+      .filter((x) => x.w !== null && (Store.data.questions[x.q.id].n > Store.data.questions[x.q.id].ok || Store.data.questions[x.q.id].last === false))
+      .sort((a, b) => b.w - a.w)
+      .slice(0, limit)
+      .map((x) => x.q);
+  }
+  // commands, files and options that appear in questions answered wrong
+  function weakTerms() {
+    const count = {};
+    for (const q of LPIC.allQuestions()) {
+      const s = Store.data.questions[q.id];
+      if (!s || s.n <= s.ok) continue;
+      const wrong = s.n - s.ok;
+      const src = [q.q].concat(q.fill ? q.fill.slice(0, 1) : [].concat(q.a).map((i) => q.o[i])).join(' ');
+      const seen = new Set();
+      for (const m of src.matchAll(/\{\{([^}]+?)\}\}/g)) {
+        const t = m[1].trim().split(/\s+/)[0].replace(/[;,]$/, '');
+        if (t.length < 2 || /^[-\d]/.test(t) && !/^-[a-zA-Z]/.test(t)) continue;
+        if (seen.has(t)) continue;
+        seen.add(t);
+        count[t] = (count[t] || 0) + wrong;
+      }
+      for (const f of q.fill ? q.fill.slice(0, 1) : []) {
+        const t = f.trim().split(/\s+/)[0];
+        if (t && !seen.has(t)) {
+          seen.add(t);
+          count[t] = (count[t] || 0) + wrong;
+        }
+      }
+    }
+    return Object.entries(count)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 24);
+  }
+  route(/^\/weak$/, () => {
+    const answered = LPIC.allQuestions().filter((q) => (Store.data.questions[q.id] || {}).n);
+    const rows = LPIC.sorted().map((o) => {
+      let n = 0;
+      let ok = 0;
+      let seen = 0;
+      for (const q of o.quiz) {
+        const s = Store.data.questions[q.id];
+        if (!s || !s.n) continue;
+        seen++;
+        n += s.n;
+        ok += s.ok;
+      }
+      const acc = n ? ok / n : null;
+      // priority: exam weight × how much is still missing (unknown questions count as 50 %)
+      const cover = seen / o.quiz.length;
+      const prio = o.weight * (1 - (acc || 0) * cover);
+      return { o, n, ok, seen, acc, prio, m: mastery(o) };
+    });
+    const weakQs = weakQuestions(20);
+    const terms = weakTerms();
+    const byTopic = Object.keys(LPIC.topics).map((t) => {
+      const r = rows.filter((x) => x.o.topic === t);
+      const n = r.reduce((a, x) => a + x.n, 0);
+      const ok = r.reduce((a, x) => a + x.ok, 0);
+      return { t, n, acc: n ? ok / n : null };
+    });
+    const bar = (v, warn) => `<div class="bar ${warn ? 'warn' : ''}"><span style="width:${v === null ? 0 : pct(v)}%"></span></div>`;
+    view.innerHTML = `<h1>📉 Weak spots</h1><p class="muted">Where you lose points: objectives, commands and single questions you answered wrong most often (quiz, review, flashcards and exam simulations all count). Practise these first — weighted by their exam weight.</p>
+      ${answered.length ? '' : '<div class="callout note"><div class="ct">Not enough data yet</div><p>Answer some questions in the <a href="#/quiz">quiz center</a> or take an <a href="#/exam">exam simulation</a> — this page fills up automatically.</p></div>'}
+      <div class="grid grid-3"><div class="card stat"><div class="v">${answered.length}</div><div class="l">questions answered (of ${LPIC.allQuestions().length})</div></div><div class="card stat"><div class="v">${weakQuestions(9999).length}</div><div class="l">questions with mistakes</div></div><div class="card stat"><div class="v">${pct(answered.length ? answered.reduce((a, q) => a + Store.data.questions[q.id].ok, 0) / answered.reduce((a, q) => a + Store.data.questions[q.id].n, 0) : 0)}%</div><div class="l">overall accuracy</div></div></div>
+      <div class="card" style="margin-top:1rem"><div class="row"><h3 style="margin:0">Your 20 weakest questions</h3><span class="spacer"></span><button class="btn btn-primary" id="wkGo" ${weakQs.length ? '' : 'disabled'}>▶ Practise them now</button></div>
+        ${weakQs.length ? `<ol class="weak-list">${weakQs.map((q) => { const s = Store.data.questions[q.id]; return `<li><a href="#/obj/${q.obj}/quiz">${q.obj}</a> ${md(q.q)} <span class="muted">— ${s.ok}/${s.n} correct${s.last === false ? ', last answer wrong' : ''}</span></li>`; }).join('')}</ol>` : '<p class="muted">No mistakes recorded yet.</p>'}</div>
+      <div id="wkQuiz"></div>
+      <div class="grid grid-2" style="margin-top:1rem">
+        <div class="card"><h3 style="margin-top:0">Commands & files you miss most</h3>${terms.length ? `<div class="chips">${terms.map(([t, c]) => `<a class="chip ${SIM.man[t] ? 'known' : ''}" href="#/search?q=${encodeURIComponent(t)}" title="${c} wrong answer(s)">${esc(t)} <b>${c}</b></a>`).join('')}</div><p class="muted" style="font-size:.85rem">Click a term to find it in the wiki; known commands also have a manual page in the sandbox (<code>man NAME</code>).</p>` : '<p class="muted">Nothing yet.</p>'}</div>
+        <div class="card"><h3 style="margin-top:0">Accuracy per topic</h3><table>${byTopic.map((x) => `<tr><td><a href="#/topic/${x.t}">${x.t}</a></td><td>${esc(LPIC.topics[x.t].title)}</td><td style="width:35%">${bar(x.acc, x.acc !== null && x.acc < 0.65)}</td><td class="muted">${x.acc === null ? '–' : pct(x.acc) + '%'}</td></tr>`).join('')}</table></div>
+      </div>
+      <div class="card" style="margin-top:1rem"><h3 style="margin-top:0">Objectives by priority</h3><p class="muted" style="font-size:.88rem">Priority = exam weight × what is still missing (accuracy and coverage). Work from the top.</p>
+        <div class="tbl-wrap"><table><thead><tr><th>Objective</th><th>Weight</th><th>Questions tried</th><th>Accuracy</th><th>Mastery</th><th></th></tr></thead><tbody>${rows
+          .sort((a, b) => b.prio - a.prio || b.o.weight - a.o.weight)
+          .map((r) => `<tr><td><a href="#/obj/${r.o.id}">${r.o.id}</a> ${esc(r.o.title)}</td><td>${r.o.weight}</td><td>${r.seen}/${r.o.quiz.length}</td><td style="min-width:110px">${r.acc === null ? '<span class="muted">not tried</span>' : bar(r.acc, r.acc < 0.65) + `<span class="muted" style="font-size:.8rem">${pct(r.acc)}%</span>`}</td><td>${pct(r.m)}%</td><td><a class="btn btn-sm" href="#/obj/${r.o.id}/quiz">Quiz</a></td></tr>`)
+          .join('')}</tbody></table></div></div>`;
+    $('#wkGo').onclick = () => {
+      runQuiz($('#wkQuiz'), weakQuestions(20), { title: 'Weak spots', backHref: '#/weak' });
+      $('#wkQuiz').scrollIntoView({ behavior: 'smooth' });
+    };
   });
 
   /* =================== review =================== */

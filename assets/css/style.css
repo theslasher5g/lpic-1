@@ -1792,3 +1792,21 @@ textarea.notes {
 .de-sum ul {
   margin: 0.6rem 0 0;
 }
+
+/* weak spots */
+.weak-list {
+  margin: 0.6rem 0 0;
+  padding-left: 1.4rem;
+}
+.weak-list li {
+  margin: 0.35rem 0;
+}
+.weak-list li > a {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  margin-right: 0.3rem;
+}
+.chips a.chip {
+  text-decoration: none;
+  color: inherit;
+}
