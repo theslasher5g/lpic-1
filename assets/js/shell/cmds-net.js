@@ -493,6 +493,7 @@
     let type = 'A';
     let rev = false;
     let name = null;
+    let cls = 'IN';
     for (const a of c.args) {
       if (a.startsWith('@')) server = a.slice(1);
       else if (a === '+short') short = true;
@@ -500,9 +501,17 @@
         /* other options */
       } else if (a === '-x') rev = true;
       else if (/^(A|AAAA|MX|NS|TXT|CNAME|SOA|PTR|ANY)$/i.test(a)) type = a.toUpperCase();
+      else if (/^(IN|CH|HS)$/i.test(a)) cls = a.toUpperCase();
       else name = a;
     }
     if (!name) name = '.';
+    if (cls === 'CH') {
+      // Chaosnet class: only server self-information such as version.bind exists today
+      const v = /^(version|hostname)\.bind\.?$/i.test(name) ? (/^version/i.test(name) ? '"9.18.24-1-Debian"' : '"ns1.example.com"') : null;
+      if (short) return c.out(v ? v + '\n' : '');
+      c.out(`\n; <<>> DiG 9.18.24-1-Debian <<>> ${c.args.join(' ')}\n;; ->>HEADER<<- opcode: QUERY, status: ${v ? 'NOERROR' : 'REFUSED'}, id: 7311\n\n;; QUESTION SECTION:\n;${name}\t\tCH\t${type}\n\n${v ? `;; ANSWER SECTION:\n${name}\t0\tCH\t${type}\t${v}\n\n` : ''};; SERVER: ${server || '192.168.56.1'}#53(${server || '192.168.56.1'}) (UDP)\n`);
+      return v ? 0 : 9;
+    }
     if (rev) {
       const n = reverse(sh, name);
       const q = name.split('.').reverse().join('.') + '.in-addr.arpa.';

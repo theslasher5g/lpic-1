@@ -1485,6 +1485,12 @@ ${n === 'e1000' ? 'parm:           TxDescriptors:Number of transmit descriptors 
   };
   C.udevadm = (c) => {
     const sub = c.args[0];
+    if (sub === 'info' && c.args.some((a) => /\/sys\/class\/net\/|^\/?sys\/class\/net/.test(a))) {
+      const ifn = c.args.find((a) => /\/class\/net\//.test(a)).split('/').pop();
+      const slot = { enp0s3: '3', enp0s8: '8' }[ifn] || '3';
+      c.out(`P: /devices/pci0000:00/0000:00:0${slot}.0/net/${ifn}\nE: INTERFACE=${ifn}\nE: SUBSYSTEM=net\nE: ID_BUS=pci\nE: ID_NET_NAMING_SCHEME=v252\nE: ID_NET_NAME_MAC=enx080027${ifn === 'enp0s8' ? 'b2190c' : '4e66a1'}\nE: ID_NET_NAME_PATH=${ifn}\nE: ID_NET_DRIVER=e1000\nE: ID_NET_LINK_FILE=/usr/lib/systemd/network/99-default.link\n`);
+      return 0;
+    }
     if (sub === 'info') {
       const dev = c.args.find((a) => a.startsWith('/dev/')) || (c.args.find((a) => a.startsWith('--name=')) || '').split('=')[1] || '/dev/sda';
       c.out(`P: /devices/pci0000:00/0000:00:0d.0/ata1/host0/target0:0:0/0:0:0:0/block/${dev.replace('/dev/', '')}

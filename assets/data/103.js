@@ -893,6 +893,25 @@ $ top -b -n 1 | head -15
 In {{top}} the columns {{PR}} and {{NI}} show priority and niceness; press <kbd>r</kbd> to renice a process interactively. In {{ps aux}} the STAT flag {{N}} marks low priority (positive nice), {{<}} high priority.
 
 > EXAM: Default nice value = 0; {{nice}} without {{-n}} = +10; range −20..19; only root can use negative values; {{renice}} sets an absolute value.
+
+## Static priorities and the scheduler
+The kernel scheduler uses **static priorities 0–139**: **0–99 are reserved for real-time processes**, **100–139 for normal processes** (40 levels, one per nice value). Lower value = higher priority. A normal process starts at **120** (nice 0); nice −20 → 100, nice 19 → 139.
+
+~~~console
+$ grep ^prio /proc/1/sched
+$ ps -el | head -5
+$ ps -o pid,pri,ni,comm
+$ top -n 1 | head -12
+~~~
+Each tool shows the value differently:
+
+| Tool | Column | Normal process (nice 0) | Range for normal processes |
+|---|---|---|---|
+| kernel ({{/proc/PID/sched}}) | {{prio}} | 120 | 100–139 |
+| {{ps -el}} | {{PRI}} | 80 (add 40 → 120) | 60–99 |
+| {{top}} | {{PR}} | 20 (= 20 + NI) | 0–39; real-time shows negative or {{rt}} |
+
+> EXAM: Only **root** may lower the nice value (raise priority) — normal users can only increase niceness of their own processes. In {{top}}, press {{r}} to renice a process.
 `,
   quiz: [
     { q: 'What is the default nice value of a newly started process?', fill: ['0'], e: 'It inherits the niceness of the parent, normally 0.' },

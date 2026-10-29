@@ -417,7 +417,7 @@
     const labDone = lab ? Object.keys(st.labs || {}).length : 0;
     view.innerHTML = `<div class="crumbs"><a href="#/">Dashboard</a> › <a href="#/topic/${o.topic}">Topic ${o.topic}: ${esc(LPIC.topics[o.topic].title)}</a></div>
       <h1>${o.id} ${esc(o.title)}</h1>
-      <div class="row"><span class="badge w">Weight ${o.weight}</span><span class="badge">Exam ${o.exam}-500</span><span class="badge ${st.read ? 'good' : ''}">${st.read ? '✓ studied' : 'not studied yet'}</span><span class="badge">${qOk}/${o.quiz.length} questions correct</span>${lab ? `<span class="badge">${labDone}/${lab.tasks.length} lab tasks</span>` : ''}<span class="spacer"></span><span class="muted" style="font-size:.85rem">mastery ${pct(mastery(o))}%</span></div>
+      <div class="row"><span class="badge w">Weight ${o.weight}</span><span class="badge">Exam ${o.exam}-500</span><span class="badge ${st.read ? 'good' : ''}">${st.read ? '✓ studied' : 'not studied yet'}</span><span class="badge">${qOk}/${o.quiz.length} questions correct</span>${lab ? `<span class="badge">${labDone}/${lab.tasks.length} lab tasks</span>` : ''}<span class="spacer"></span><a class="muted" style="font-size:.85rem" target="_blank" rel="noopener" href="https://learning.lpi.org/de/learning-materials/${o.exam}-500/${o.topic}/${o.id}/" title="Official LPI Learning Materials for this objective">📘 LPI Learning Materials</a><span class="muted" style="font-size:.85rem">mastery ${pct(mastery(o))}%</span></div>
       <div class="tabs" role="tablist">
         <a class="tab ${tab === 'learn' ? 'active' : ''}" href="#/obj/${o.id}">📚 Learn</a>
         <a class="tab ${tab === 'quiz' ? 'active' : ''}" href="#/obj/${o.id}/quiz">❓ Quiz <span class="badge">${o.quiz.length}</span></a>

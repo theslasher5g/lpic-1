@@ -413,6 +413,16 @@ $ date -d @1700000000
 ~~~
 
 Format: {{%Y}} year, {{%m}} month, {{%d}} day, {{%H:%M:%S}} time, {{%F}} = {{%Y-%m-%d}}, {{%T}} = {{%H:%M:%S}}, {{%A}}/{{%a}} weekday, {{%B}}/{{%b}} month name, {{%j}} day of year, {{%s}} epoch seconds, {{%Z}} zone. Setting the clock is covered in 108.1.
+
+## Daylight saving time
+Many regions switch to **daylight saving time (DST)** for part of the year. The rules are part of the tz database files in {{/usr/share/zoneinfo/}} that {{/etc/localtime}} points to — the system clock itself stays in UTC, only the *display* changes. Because governments change DST rules, keep the **tzdata** package up to date ({{apt upgrade}} / {{dnf upgrade}}); an outdated tzdata is the classic reason for a clock that is wrong by exactly one hour.
+
+~~~console
+$ ls -l /etc/localtime
+$ TZ=Europe/Berlin date -d '2026-07-01 12:00 UTC'
+$ TZ=Europe/Berlin date -d '2026-12-01 12:00 UTC'
+$ dpkg -l tzdata
+~~~
 `,
   quiz: [
     { q: 'Which variable overrides all other locale settings?', fill: ['LC_ALL'], e: 'Priority: LC_ALL > LC_* > LANG.' },

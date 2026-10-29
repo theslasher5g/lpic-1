@@ -285,6 +285,30 @@ DNS=192.168.56.1
 # systemctl enable --now systemd-networkd
 $ resolvectl status
 ~~~
+
+## Network interface names
+Old systems named interfaces in detection order: {{eth0}}, {{eth1}}, {{wlan0}} … — names could even swap after a reboot. systemd/udev uses **predictable interface names** with a two-letter type prefix:
+
+| Prefix | Type |
+|---|---|
+| {{en}} | Ethernet |
+| {{wl}} | wireless LAN |
+| {{ww}} | wireless WAN (mobile) |
+| {{ib}} | InfiniBand |
+| {{sl}} | serial line IP (SLIP) |
+
+The rest of the name is chosen by these rules, in descending priority:
+1. index provided by firmware/BIOS for on-board devices → {{eno1}}
+2. PCI Express hot-plug slot index → {{ens1}}
+3. physical location on the bus → {{enp3s5}} (bus 3, slot 5 — matches {{03:05.0}} in {{lspci}})
+4. MAC address → {{enx78e7d1ea46da}} (not used by default)
+5. classic kernel name → {{eth0}}
+
+~~~console
+$ ip -br link
+$ lspci | grep -i ethernet
+$ udevadm info /sys/class/net/enp0s3 | grep ID_NET_NAME
+~~~
 `,
   quiz: [
     { q: 'Which file contains the persistent static host name on a systemd-based system?', fill: ['/etc/hostname'], e: '' },
@@ -549,6 +573,12 @@ $ resolvectl statistics
 - {{NXDOMAIN}} → typo or missing record; {{SERVFAIL}}/timeout → server or network problem.
 - Short names fail but FQDNs work → check the {{search}} line.
 - Stale answers → flush caches ({{resolvectl flush-caches}}, restart nscd/dnsmasq).
+
+## DNS classes
+Every DNS record has a **class** besides its type. There are three: **IN** (Internet — practically everything you will see), **CH** (Chaosnet, obsolete; today used for server information queries like {{dig CH TXT version.bind @server}}) and **HS** (Hesiod, storing user/group data in DNS). The class appears in dig output between TTL and type: {{example.com. 3600 IN A 93.184.215.14}}.
+
+## nsswitch.conf actions
+Entries in {{/etc/nsswitch.conf}} may carry actions in brackets that control the fallback: {{hosts: dns [!UNAVAIL=return] files}} means "if DNS is reachable, take its answer (even 'not found') and do not consult /etc/hosts". Status values: {{SUCCESS}}, {{NOTFOUND}}, {{UNAVAIL}}, {{TRYAGAIN}}; actions: {{return}}, {{continue}}. See {{man nsswitch.conf}}.
 `,
   quiz: [
     { q: 'Which command queries the DNS server {{1.1.1.1}} directly for the MX records of {{example.com}}?', fill: ['dig @1.1.1.1 example.com MX', 'dig @1.1.1.1 MX example.com', 'dig @1.1.1.1 -t MX example.com', 'host -t MX example.com 1.1.1.1', 'dig MX example.com @1.1.1.1', 'dig example.com MX @1.1.1.1'], e: '' },

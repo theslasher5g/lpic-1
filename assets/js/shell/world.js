@@ -1209,6 +1209,7 @@ Oct 26 08:10:01 lpic-lab kernel: [    1.512309] EXT4-fs (sda2): mounted filesyst
     F('/proc/sys/kernel/osrelease', '6.1.0-18-amd64\n', 0o444);
     D('/proc/1', 0o555);
     F('/proc/1/cmdline', '/sbin/init', 0o444);
+    F('/proc/1/sched', 'systemd (1, #threads: 1)\n-------------------------------------------------------------------\nse.exec_start                                :          12034.443121\nse.sum_exec_runtime                          :           1820.551001\nnr_switches                                  :                  4512\npolicy                                       :                     0\nprio                                         :                   120\nclock-delta                                  :                    41\n', 0o444);
     D('/sys/class/net/enp0s3');
     D('/sys/class/net/lo');
     F('/sys/class/net/enp0s3/address', '08:00:27:4e:66:a1\n', 0o444);
@@ -1420,6 +1421,7 @@ Oct 26 08:10:01 lpic-lab kernel: [    1.512309] EXT4-fs (sda2): mounted filesyst
       ],
       nextPid: 2001,
       packagesDeb: {
+        tzdata: ['2024a-0+deb12u1', 'time zone and daylight-saving time data', 'localization', [], '/usr/share/zoneinfo/Europe/Berlin,/usr/share/zoneinfo/UTC'],
         bash: ['5.2.15-2+b2', 'GNU Bourne Again SHell', 'shells', ['base-files', 'debianutils'], '/bin/bash,/etc/bash.bashrc,/usr/share/doc/bash/README'],
         coreutils: ['9.1-1', 'GNU core utilities', 'utils', [], '/usr/bin/ls,/usr/bin/cp,/usr/bin/mv,/usr/bin/cat,/usr/bin/chmod'],
         'openssh-server': ['1:9.2p1-2+deb12u2', 'secure shell (SSH) server, for secure access from remote machines', 'net', ['openssh-client', 'libssl3'], '/usr/sbin/sshd,/etc/ssh/sshd_config,/lib/systemd/system/ssh.service'],
