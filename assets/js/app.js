@@ -125,6 +125,7 @@
       <a class="nav-a ${cur.startsWith('#/exam') ? 'active' : ''}" href="#/exam">⏱️ <span class="grow">Exam simulator</span></a>
       <a class="nav-a ${cur.startsWith('#/review') ? 'active' : ''}" href="#/review">🔁 <span class="grow">Review</span><span class="badge warn" id="dueBadge"></span></a>
       <a class="nav-a ${cur.startsWith('#/weak') ? 'active' : ''}" href="#/weak">📉 <span class="grow">Weak spots</span></a>
+      <a class="nav-a ${cur.startsWith('#/cheat') ? 'active' : ''}" href="#/cheat">📝 <span class="grow">Cheatsheets</span></a>
       <a class="nav-a ${cur.startsWith('#/cards') ? 'active' : ''}" href="#/cards">🃏 <span class="grow">Flashcards</span></a>
       <a class="nav-a ${cur.startsWith('#/sims') || cur.startsWith('#/sim/') ? 'active' : ''}" href="#/sims">🧪 <span class="grow">Simulations</span></a>
       <a class="nav-a ${cur.startsWith('#/shell') ? 'active' : ''}" href="#/shell">⌨️ <span class="grow">Sandbox shell</span></a>
@@ -938,6 +939,60 @@
     };
     $('#exSubmit').onclick = submit;
     show();
+  });
+
+  /* =================== cheatsheets =================== */
+  // "> EXAM: …" callouts of an objective's wiki, as plain markdown strings
+  function examNotes(o) {
+    const lines = (o.wiki || '').replace(/\$\\\{/g, '${').replace(/\\`/g, '`').split('\n');
+    const notes = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = /^\s*>\s*EXAM:\s*(.*)$/.exec(lines[i]);
+      if (!m) continue;
+      let t = m[1];
+      while (i + 1 < lines.length && /^\s*>\s?\S/.test(lines[i + 1]) && !/^\s*>\s*(TIP|WARN|NOTE|INFO|EXAM):/.test(lines[i + 1])) t += ' ' + lines[++i].replace(/^\s*>\s?/, '');
+      notes.push(t.trim());
+    }
+    return notes;
+  }
+  function cheatTopicHtml(t) {
+    const objs = LPIC.ofTopic(t);
+    let h = `<section class="cheat-topic"><h2>${LPIC.topics[t].icon} ${t} ${esc(LPIC.topics[t].title)}</h2>`;
+    for (const o of objs) {
+      const cmds = [];
+      const files = [];
+      const other = [];
+      for (const term of o.terms) {
+        const base = term.replace(/\s.*$/, '').replace(/[()]/g, '');
+        if (SIM.man[base]) cmds.push({ term, e: SIM.man[base] });
+        else if (/^[/~]/.test(term)) files.push(term);
+        else other.push(term);
+      }
+      const notes = examNotes(o);
+      h += `<div class="cheat-obj"><h3>${o.id} ${esc(o.title)} <span class="badge w">w${o.weight}</span></h3>`;
+      if (cmds.length) h += `<table class="cheat-tbl">${cmds.map((c) => `<tr><td><code>${esc(c.term)}</code></td><td>${esc(c.e.d)}${c.e.o.length ? `<div class="cheat-opts">${c.e.o.slice(0, 4).map((x) => (/\s{2,}/.test(x) ? `<code>${esc(x.split(/\s{2,}/)[0])}</code> ${esc(x.split(/\s{2,}/).slice(1).join(' '))}` : esc(x))).join(' · ')}</div>` : ''}</td></tr>`).join('')}</table>`;
+      if (files.length) h += `<p class="cheat-files"><b>Files:</b> ${files.map((f) => `<code>${esc(f)}</code>`).join(' ')}</p>`;
+      if (other.length) h += `<p class="cheat-files"><b>Terms:</b> ${other.map((f) => esc(f)).join(' · ')}</p>`;
+      if (notes.length) h += `<ul class="cheat-notes">${notes.map((n) => `<li>${md(n)}</li>`).join('')}</ul>`;
+      if (deOn() && LPIC.deSummary[o.id]) h += `<details class="cheat-de" lang="de"><summary><span class="de-flag">DE</span> Kurzfassung</summary>${MD.render(LPIC.deSummary[o.id]).html}</details>`;
+      h += `</div>`;
+    }
+    return h + '</section>';
+  }
+  route(/^\/cheat(?:\/(\d+|101-500|102-500))?$/, (m) => {
+    const sel = m[1];
+    const topics = !sel ? null : sel === '101-500' ? LPIC.exams[0].topics : sel === '102-500' ? LPIC.exams[1].topics : [sel];
+    const pick = `<div class="row no-print"><a class="btn btn-sm ${!sel ? 'btn-primary' : ''}" href="#/cheat">Overview</a>${LPIC.exams.map((ex) => `<a class="btn btn-sm ${sel === ex.code ? 'btn-primary' : ''}" href="#/cheat/${ex.code}">${ex.code} complete</a>`).join('')}${Object.keys(LPIC.topics).map((t) => `<a class="btn btn-sm ${sel === t ? 'btn-primary' : ''}" href="#/cheat/${t}">${t}</a>`).join('')}<span class="spacer"></span>${topics ? '<button class="btn" id="chPrint">🖨 Print / save as PDF</button>' : ''}</div>`;
+    if (!topics) {
+      view.innerHTML = `<h1>📝 Cheatsheets</h1><p class="muted">Compact, printable summaries for the last days before the exam: the commands of every objective with their key options, the files and terms from the official objective list, and all "Exam focus" notes from the wiki. Choose a topic or a whole exam, then print it or save it as PDF.</p>${pick}
+        <div class="grid grid-auto" style="margin-top:1rem">${Object.keys(LPIC.topics).map((t) => `<a class="card sim-card" href="#/cheat/${t}"><span class="ico">${LPIC.topics[t].icon}</span><h3>${t} ${esc(LPIC.topics[t].title)}</h3><p>${LPIC.ofTopic(t).length} objectives</p></a>`).join('')}</div>`;
+      return;
+    }
+    view.innerHTML = `<div class="crumbs no-print"><a href="#/cheat">Cheatsheets</a></div><h1 class="cheat-title">📝 LPIC-1 cheatsheet — ${sel.length === 3 ? 'Topic ' + sel + ': ' + esc(LPIC.topics[sel].title) : 'Exam ' + sel}</h1>${pick}<div class="cheat">${topics.map(cheatTopicHtml).join('')}</div>`;
+    $('#chPrint').onclick = () => {
+      $$('.cheat-de').forEach((d) => (d.open = true));
+      window.print();
+    };
   });
 
   /* =================== weak spots =================== */

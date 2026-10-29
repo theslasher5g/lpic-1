@@ -1825,3 +1825,89 @@ textarea.notes {
   margin-right: 0.3rem;
   vertical-align: -1px;
 }
+
+/* cheatsheets */
+.cheat {
+  margin-top: 1rem;
+}
+.cheat-topic h2 {
+  border-bottom: 2px solid var(--accent);
+  padding-bottom: 0.2rem;
+  margin-top: 1.6rem;
+}
+.cheat-obj {
+  margin: 0.8rem 0 1.2rem;
+}
+.cheat-obj h3 {
+  break-after: avoid;
+}
+.cheat-tbl tr {
+  break-inside: avoid;
+}
+.cheat-obj h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.02rem;
+}
+.cheat-tbl {
+  font-size: 0.86rem;
+  width: 100%;
+}
+.cheat-tbl td {
+  padding: 0.22rem 0.5rem;
+  vertical-align: top;
+}
+.cheat-tbl td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+.cheat-opts {
+  color: var(--fg2);
+  font-size: 0.8rem;
+  margin-top: 0.1rem;
+}
+.cheat-files,
+.cheat-notes {
+  font-size: 0.86rem;
+  margin: 0.35rem 0;
+}
+.cheat-notes li::marker {
+  content: '★ ';
+  color: var(--warn);
+}
+.cheat-de {
+  font-size: 0.86rem;
+}
+@media print {
+  .no-print,
+  .crumbs,
+  .toast {
+    display: none !important;
+  }
+  body,
+  .view {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .cheat {
+    columns: 2;
+    column-gap: 1.4rem;
+    font-size: 9pt;
+  }
+  .cheat-topic h2 {
+    column-span: all;
+    font-size: 13pt;
+  }
+  .cheat-title {
+    font-size: 15pt;
+    margin: 0 0 0.4rem;
+  }
+  .cheat code {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-weight: 600;
+  }
+  .cheat-de summary {
+    display: none;
+  }
+}
