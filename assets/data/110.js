@@ -150,7 +150,7 @@ $ groups
   quiz: [
     { q: 'Which command finds all files with the SUID bit set on the whole system?', fill: ['find / -perm -4000', 'find / -perm -4000 -type f', 'find / -perm -u+s', 'find / -perm /4000', 'find / -perm -u=s', 'find / -type f -perm -4000', 'find / -perm -4000 2>/dev/null', 'find / -perm /u+s', 'find / -perm /u=s'], e: '' },
     { q: 'Which find option matches files having the SUID **or** the SGID bit?', o: ['{{-perm /6000}}', '{{-perm -6000}}', '{{-perm 6000}}', '{{-suid -sgid}}'], a: 0, e: '{{-6000}} requires both bits.' },
-    { q: 'Which command forces the user {{alice}} to change her password at the next login? (Choose two.)', o: ['{{chage -d 0 alice}}', '{{passwd -e alice}}', '{{passwd -l alice}}', '{{usermod -L alice}}'], a: [0, 1], e: '' },
+    { q: 'Security policy: {{alice}} must set a new password the next time she logs in. Which commands enforce this? (Choose two.)', o: ['{{chage -d 0 alice}}', '{{passwd -e alice}}', '{{passwd -l alice}}', '{{usermod -L alice}}'], a: [0, 1], e: '' },
     { q: 'Which command sets the maximum password age of {{bob}} to 60 days?', fill: ['chage -M 60 bob', 'chage --maxdays 60 bob', 'passwd -x 60 bob'], e: '' },
     { q: 'Which command shows the failed login attempts recorded in {{/var/log/btmp}}?', fill: ['lastb'], e: '{{last}} reads /var/log/wtmp.' },
     { q: 'Which command shows who is logged in and what they are currently doing?', fill: ['w'], e: '{{who}} shows logins without the activity.' },
@@ -481,7 +481,7 @@ $ gpg --keyserver keys.openpgp.org --send-keys KEYID   # tell the world
     { q: 'What is the purpose of the files {{/etc/ssh/ssh_host_*_key}}?', o: ['They authenticate users to the server.', 'They identify the SSH server to clients.', 'They encrypt the user\'s home directory.', 'They store known client keys.'], a: 1, e: 'Clients compare them with known_hosts.' },
     { q: 'Which command adds a private key to the running ssh-agent?', fill: ['ssh-add', 'ssh-add ~/.ssh/id_rsa', 'ssh-add ~/.ssh/id_ed25519'], e: '{{ssh-add -l}} lists loaded keys.' },
     { q: 'Which command forwards local port 8080 through {{gw}} to port 80 of {{intranet}}?', fill: ['ssh -L 8080:intranet:80 gw', 'ssh -L8080:intranet:80 gw', 'ssh gw -L 8080:intranet:80', 'ssh -N -L 8080:intranet:80 gw', 'ssh -L 8080:intranet:80 -N gw'], e: 'Remote forwarding uses -R.' },
-    { q: 'Which ssh option enables X11 forwarding?', o: ['{{-X}}', '{{-x}}', '{{-D}}', '{{-L}}'], a: 0, e: '{{-x}} disables X11 forwarding, {{-Y}} is trusted forwarding.' },
+    { q: 'You want to run {{xclock}} on {{fileserver}} and see its window on your local display through the SSH connection. Which ssh option do you use?', o: ['{{-X}}', '{{-x}}', '{{-D}}', '{{-L}}'], a: 0, e: '{{-x}} disables X11 forwarding, {{-Y}} is trusted forwarding.' },
     { q: 'Which permissions should a private SSH key file have?', fill: ['600', '0600', '400', '0400'], e: 'ssh ignores keys that are readable by others.' },
     { q: 'Which command starts an ssh-agent and sets the required environment variables in the current shell?', fill: ['eval $(ssh-agent)', 'eval `ssh-agent`', 'eval "$(ssh-agent)"', 'eval $(ssh-agent -s)', 'eval "$(ssh-agent -s)"'], e: 'SSH_AUTH_SOCK and SSH_AGENT_PID.' },
     { q: 'Which gpg command encrypts {{file.txt}} for the recipient {{alice}}?', fill: ['gpg -e -r alice file.txt', 'gpg --encrypt --recipient alice file.txt', 'gpg -r alice -e file.txt', 'gpg -er alice file.txt', 'gpg --encrypt -r alice file.txt'], e: 'You need alice\'s public key in your keyring.' },

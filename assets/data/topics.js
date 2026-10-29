@@ -28,6 +28,13 @@
       this.objectives.push(o);
       this.byId[o.id] = o;
     },
+    // extra question sets (assets/data/q1xx.js) continue the numbering of an objective
+    addQuiz(id, qs) {
+      const o = this.byId[id];
+      if (!o) throw new Error('unknown objective ' + id);
+      const start = o.quiz.length;
+      qs.forEach((q, i) => o.quiz.push(Object.assign({ id: id + '#' + (start + i), obj: id }, q)));
+    },
     sorted() {
       const k = (id) => id.split('.').map((x) => x.padStart(3, '0')).join('.');
       return this.objectives.slice().sort((a, b) => (k(a.id) < k(b.id) ? -1 : 1));

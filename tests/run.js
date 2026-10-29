@@ -11,7 +11,9 @@ const ROOT = path.join(__dirname, '..', 'assets');
 for (const f of ['vfs', 'world', 'parser', 'interp', 'builtins', 'hash', 'cmds-files', 'cmds-text', 'cmds-sys', 'cmds-net', 'man']) require(path.join(ROOT, 'js', 'shell', f + '.js'));
 require(path.join(ROOT, 'js', 'labh.js'));
 require(path.join(ROOT, 'data', 'topics.js'));
-for (const f of ['101', '102', '103', '104', '105', '106', '107', '108', '109', '110', 'labs']) require(path.join(ROOT, 'data', f + '.js'));
+for (const f of ['101', '102', '103', '104', '105', '106', '107', '108', '109', '110']) require(path.join(ROOT, 'data', f + '.js'));
+for (const f of ['q101', 'q102', 'q103', 'q104', 'q105', 'q106', 'q107', 'q108', 'q109', 'q110']) if (require('fs').existsSync(path.join(ROOT, 'data', f + '.js'))) require(path.join(ROOT, 'data', f + '.js'));
+require(path.join(ROOT, 'data', 'labs.js'));
 
 const SIMS_IDS = {};
 for (const m of require('fs').readFileSync(path.join(ROOT, 'js', 'sims.js'), 'utf8').matchAll(/^\s{4}id: '([\w-]+)'/gm)) SIMS_IDS[m[1]] = true;
@@ -113,6 +115,12 @@ section('content');
     const src = o.wiki;
     ok((src.match(/^~~~/gm) || []).length % 2 === 0, `${o.id} wiki has balanced ~~~ fences`);
     ok((src.match(/\{\{/g) || []).length === (src.match(/\}\}/g) || []).length, `${o.id} wiki has balanced {{ }}`);
+  }
+  const seenText = new Map();
+  for (const q of LPIC.allQuestions()) {
+    const k = q.q.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    ok(!seenText.has(k), `question text is unique: ${q.id}`, 'same as ' + seenText.get(k));
+    seenText.set(k, q.id);
   }
   console.log(`  ${objs.length} objectives, ${ids.size} questions, ${Object.keys(LPIC.labs).length} labs`);
 }
