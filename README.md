@@ -40,7 +40,9 @@ docker run --rm -v lpic1-data:/data -v "$PWD":/backup alpine cp /data/lpic1.db /
 docker run --rm -v lpic1-data:/data -v "$PWD":/backup alpine cp /backup/lpic1.db /data/
 ```
 
-To use a different port, change `"8080:8080"` in `docker-compose.yml` (for example `"3000:8080"`).
+The port is published on `127.0.0.1` only, so the site is reachable from your own PC but not from other devices in your network (there is no login). To use a different port, change `127.0.0.1:8080:8080` in `docker-compose.yml` (for example `127.0.0.1:3000:8080`). To open the site from other devices on purpose, use `"8080:8080"`; then anyone in your network can see and overwrite the progress.
+
+The sandbox has no real network access: `ping`, `dig`, `ssh`, `apt` etc. are simulated in the browser and never send a packet.
 
 You can also export and import your progress as a JSON file under **Settings** in the app.
 
@@ -48,7 +50,7 @@ You can also export and import your progress as a JSON file under **Settings** i
 
 ```bash
 docker build -t lpic1-trainer .
-docker run -d --name lpic1 -p 8080:8080 -v lpic1-data:/data --restart unless-stopped lpic1-trainer
+docker run -d --name lpic1 -p 127.0.0.1:8080:8080 -v lpic1-data:/data --restart unless-stopped lpic1-trainer
 ```
 
 ## Run without Docker
