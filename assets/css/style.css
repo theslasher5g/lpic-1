@@ -1911,3 +1911,199 @@ textarea.notes {
     display: none;
   }
 }
+
+/* step-by-step reading (focus mode) */
+.wiki {
+  max-width: 760px;
+}
+.wiki p,
+.wiki li {
+  line-height: 1.7;
+}
+.wiki .wsec[hidden],
+.wiki [hidden] {
+  display: none !important;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin: 0.2rem 0 1rem;
+  position: sticky;
+  top: var(--top-h);
+  background: var(--bg);
+  padding: 0.5rem 0;
+  z-index: 5;
+}
+.steps {
+  display: flex;
+  gap: 0.3rem;
+}
+.step {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: var(--fg2);
+  font: 600 0.8rem var(--sans);
+  cursor: pointer;
+}
+.step.seen {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.step.cur {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.step-title {
+  font-size: 0.9rem;
+}
+.step-nav {
+  display: flex;
+  margin: 1.4rem 0;
+}
+.wiki-extra {
+  margin-top: 1.4rem;
+}
+details.ref > summary,
+details.de-sum > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+details.card {
+  margin-bottom: 0.8rem;
+}
+.done-card {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 1.4rem;
+}
+.wiki h2 {
+  margin-top: 0;
+}
+
+/* study plan */
+.plan-form {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.plan-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+  color: var(--fg2);
+}
+.plan-week {
+  margin: 0.6rem 0;
+}
+.plan-week.cur {
+  border-color: var(--accent);
+}
+.plan-week > summary {
+  cursor: pointer;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.plan-list {
+  margin: 0.6rem 0;
+  padding-left: 1.2rem;
+}
+.plan-list li {
+  margin: 0.3rem 0;
+}
+.plan-list li.done a {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.plan-daily {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--fg2);
+}
+.plan-head {
+  margin-top: 1.4rem;
+}
+
+/* "Today" dashboard */
+.today {
+  padding: 1.4rem 1.6rem;
+}
+.today-steps {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+.today-step {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--fg2);
+  font-size: 0.9rem;
+}
+.today-step.ok {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+.btn-lg {
+  padding: 0.7rem 1.4rem;
+  font-size: 1.05rem;
+}
+.today-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.8rem;
+  margin: 0.8rem 0;
+}
+.today-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: inherit;
+  padding: 0.9rem 1.1rem;
+}
+.today-mini b {
+  font-size: 1.5rem;
+}
+.today-mini span {
+  font-size: 0.88rem;
+  color: var(--fg2);
+}
+.today-stats {
+  font-size: 0.88rem;
+  margin: 0.4rem 0 1.2rem;
+}
+.overview {
+  margin-top: 0.8rem;
+}
+.overview > summary {
+  cursor: pointer;
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-more > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+}
+.nav-more > summary::-webkit-details-marker {
+  display: none;
+}

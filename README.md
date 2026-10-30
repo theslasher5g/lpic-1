@@ -2,6 +2,8 @@
 
 An interactive study site for the **LPIC-1 certification (version 5.0)**, covering exams **101-500** and **102-500**. It works both as a **wiki** for looking things up and as a **trainer** for testing yourself:
 
+- **Calm layout**: the start page "Today" shows one next step; wiki pages are read step by step (one section at a time, switchable under *Settings → Layout*); less-used tools are folded into "More tools".
+- **Study plan**: enter your exam dates and hours per week; the plan schedules every objective, ends with exam training and is recalculated daily (finished objectives are skipped).
 - **Wiki for all 42 objectives** (101.1 – 110.3), with every term from the official objective list, worked examples, config file samples and "Exam focus" notes. Weights and term lists are checked against the official LPI Learning Materials, and every objective page links to its Learning Materials chapter.
 - **1001 practice questions** (single choice, multiple choice, fill-in-the-blank, scenarios), each with an English explanation.
 - **Optional German help**: a German explanation for every question and a German summary on every objective page (*Settings → Language*). The questions themselves stay in English, as in the exam.

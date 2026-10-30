@@ -99,6 +99,31 @@ const ok = (cond, name, info) => {
     ok(await page.$('.feedback'), 'quiz shows feedback');
     ok(await page.$('.feedback .de-ex'), 'quiz feedback includes the German explanation');
 
+    console.log('■ calm layout: today, plan, step-by-step reading');
+    await visit('#/plan', 300);
+    const exam = new Date(Date.now() + 56 * 86400000).toISOString().slice(0, 10);
+    await page.fill('input[name=d101]', exam);
+    await page.fill('input[name=hours]', '10');
+    await page.click('#planForm button[type=submit]');
+    await page.waitForTimeout(400);
+    ok((await page.$$('.plan-week')).length === 8, 'plan has one block per week (8 weeks)', (await page.$$('.plan-week')).length);
+    ok(await page.$('.plan-week.cur'), 'current week is highlighted');
+    await visit('', 400);
+    ok(/Week 1 of 8/.test(await page.textContent('.today')), 'Today shows the plan week', (await page.textContent('.today')).slice(0, 80));
+    ok(await page.$('.today a.btn-primary'), 'Today has exactly one main action button');
+    ok((await page.$$('#sidebar > .nav-sec:first-child > a.nav-a')).length <= 6, 'sidebar shows at most 6 main entries');
+    await visit('#/obj/103.4', 400);
+    ok((await page.$$('.wsec:not([hidden])')).length === 1, 'objective page shows one wiki section at a time');
+    const h1 = await page.evaluate(() => document.getElementById('view').scrollHeight);
+    ok(h1 < 2200, 'objective page is short in step-by-step mode', h1);
+    await page.click('#stepNext');
+    ok(/2 \//.test(await page.textContent('#stepTitle')), 'Next moves to step 2');
+    await page.click('#showAll');
+    await page.waitForTimeout(300);
+    ok((await page.$$('.wsec:not([hidden])')).length > 1, '"Show all" displays the whole page');
+    await page.click('#focusOn');
+    await page.waitForTimeout(300);
+
     console.log('■ lab and scenario');
     await visit('#/obj/104.6/lab', 500);
     for (const c of ['ln orig.txt orig-hard', 'ln -s orig.txt orig-sym']) await type('#labTerm', c);

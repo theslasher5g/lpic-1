@@ -116,21 +116,28 @@
 
   /* =================== sidebar =================== */
   const openTopics = new Set();
+  let sideMoreOpen = false;
   function renderSidebar() {
     const sb = $('#sidebar');
     const cur = location.hash;
+    const link = (href, icon, label, extra = '') => `<a class="nav-a ${cur === href || (href !== '#/' && cur.startsWith(href)) ? 'active' : ''}" href="${href}">${icon} <span class="grow">${label}</span>${extra}</a>`;
+    const more = [
+      ['#/quiz', '❓', 'Quiz center'],
+      ['#/weak', '📉', 'Weak spots'],
+      ['#/cards', '🃏', 'Flashcards'],
+      ['#/cheat', '📝', 'Cheatsheets'],
+      ['#/sims', '🧪', 'Simulations'],
+      ['#/commands', '📖', 'Command reference'],
+    ];
+    const moreOpen = sideMoreOpen || more.some(([hr]) => cur.startsWith(hr) || (hr === '#/sims' && cur.startsWith('#/sim/')));
     let h = `<div class="nav-sec">
-      <a class="nav-a ${cur === '' || cur === '#/' ? 'active' : ''}" href="#/">🏠 <span class="grow">Dashboard</span></a>
-      <a class="nav-a ${cur.startsWith('#/quiz') ? 'active' : ''}" href="#/quiz">❓ <span class="grow">Quiz center</span></a>
-      <a class="nav-a ${cur.startsWith('#/exam') ? 'active' : ''}" href="#/exam">⏱️ <span class="grow">Exam simulator</span></a>
-      <a class="nav-a ${cur.startsWith('#/review') ? 'active' : ''}" href="#/review">🔁 <span class="grow">Review</span><span class="badge warn" id="dueBadge"></span></a>
-      <a class="nav-a ${cur.startsWith('#/weak') ? 'active' : ''}" href="#/weak">📉 <span class="grow">Weak spots</span></a>
-      <a class="nav-a ${cur.startsWith('#/cheat') ? 'active' : ''}" href="#/cheat">📝 <span class="grow">Cheatsheets</span></a>
-      <a class="nav-a ${cur.startsWith('#/cards') ? 'active' : ''}" href="#/cards">🃏 <span class="grow">Flashcards</span></a>
-      <a class="nav-a ${cur.startsWith('#/scenario') ? 'active' : ''}" href="#/scenarios">🛠️ <span class="grow">Troubleshooting</span></a>
-      <a class="nav-a ${cur.startsWith('#/sims') || cur.startsWith('#/sim/') ? 'active' : ''}" href="#/sims">🧪 <span class="grow">Simulations</span></a>
-      <a class="nav-a ${cur.startsWith('#/shell') ? 'active' : ''}" href="#/shell">⌨️ <span class="grow">Sandbox shell</span></a>
-      <a class="nav-a ${cur.startsWith('#/commands') ? 'active' : ''}" href="#/commands">📖 <span class="grow">Command reference</span></a>
+      ${link('#/', '🏠', 'Today')}
+      ${link('#/plan', '🗓️', 'Study plan')}
+      ${link('#/review', '🔁', 'Review', '<span class="badge warn" id="dueBadge"></span>')}
+      ${link('#/exam', '⏱️', 'Exam simulator')}
+      ${link('#/scenarios', '🛠️', 'Troubleshooting')}
+      ${link('#/shell', '⌨️', 'Sandbox shell')}
+      <details class="nav-more" ${moreOpen ? 'open' : ''}><summary class="nav-a">⋯ <span class="grow">More tools</span></summary>${more.map(([hr, ic, lb]) => link(hr, ic, lb)).join('')}</details>
     </div>`;
     for (const ex of LPIC.exams) {
       const r = readiness(LPIC.ofExam(ex.id));
@@ -152,6 +159,8 @@
     sb.innerHTML = h;
     const due = dueQuestions().length;
     $('#dueBadge').textContent = due ? due : '';
+    const nm = $('.nav-more', sb);
+    if (nm) nm.addEventListener('toggle', () => (sideMoreOpen = nm.open));
     $$('.nav-topic', sb).forEach((el) =>
       el.addEventListener('click', () => {
         const t = el.dataset.topic;
@@ -333,6 +342,120 @@
   }
   window.addEventListener('hashchange', render);
 
+  /* =================== study plan =================== */
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const parseYmd = (t) => {
+    const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(t || '');
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+  };
+  const fmtDay = (d) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const objDone = (o) => !!(Store.data.objectives[o.id] || {}).read && mastery(o) >= 0.6;
+  // estimated effort of an objective in hours: reading, typing the examples, lab, quiz
+  const objHours = (o) => 0.5 + 0.4 * o.weight + (LPIC.labs[o.id] ? 0.25 : 0);
+  // schedule for the exams that have a date; study weeks start today (102 starts after the 101 date)
+  function buildPlan(cfg) {
+    const today = dayStart(new Date());
+    const hours = Math.max(1, +cfg.hours || 6);
+    const exams = [];
+    let startAt = today;
+    for (const ex of ['101', '102']) {
+      const date = parseYmd(cfg['d' + ex]);
+      if (!date) continue;
+      const start = ex === '102' && parseYmd(cfg.d101) && date > parseYmd(cfg.d101) ? new Date(Math.max(today, parseYmd(cfg.d101).getTime() + 86400000)) : today;
+      const days = Math.ceil((date - start) / 86400000);
+      if (days < 1) {
+        exams.push({ ex, date, past: true, weeks: [] });
+        continue;
+      }
+      const nWeeks = Math.max(1, Math.ceil(days / 7));
+      const examWeeks = nWeeks >= 6 ? 2 : nWeeks >= 3 ? 1 : 0;
+      const learnWeeks = nWeeks - examWeeks;
+      const queue = LPIC.ofExam(ex).filter((o) => !objDone(o));
+      const doneCount = LPIC.ofExam(ex).length - queue.length;
+      const need = queue.reduce((a, o) => a + objHours(o), 0);
+      const cap = hours * 0.75; // the rest of the time goes into the daily review
+      const weeks = [];
+      let qi = 0;
+      for (let w = 0; w < nWeeks; w++) {
+        const wStart = new Date(start.getTime() + w * 7 * 86400000);
+        const wEnd = new Date(Math.min(wStart.getTime() + 6 * 86400000, date.getTime()));
+        const wk = { n: w + 1, start: wStart, end: wEnd, objs: [], kind: 'learn', h: 0 };
+        if (w < learnWeeks) {
+          const last = w === learnWeeks - 1;
+          while (qi < queue.length && (last || wk.h + objHours(queue[qi]) / 2 <= cap || !wk.objs.length)) {
+            wk.objs.push(queue[qi]);
+            wk.h += objHours(queue[qi]);
+            qi++;
+          }
+        } else {
+          wk.kind = w === nWeeks - 1 ? 'final' : 'exam';
+        }
+        weeks.push(wk);
+      }
+      const need_per_week = learnWeeks ? need / 0.75 / learnWeeks : Infinity;
+      exams.push({ ex, date, start, days, nWeeks, learnWeeks, examWeeks, weeks, need, doneCount, total: LPIC.ofExam(ex).length, needPerWeek: need_per_week, tight: need_per_week > hours * 1.05, hours });
+    }
+    return { exams, hours, today };
+  }
+  // what to do today according to the plan (first unfinished objective of the current or an earlier week)
+  function planToday() {
+    const cfg = Store.data.settings.plan;
+    if (!cfg || (!cfg.d101 && !cfg.d102)) return null;
+    const plan = buildPlan(cfg);
+    for (const e of plan.exams) {
+      if (e.past) continue;
+      const now = plan.today;
+      const idx = Math.max(0, e.weeks.findIndex((w) => now <= w.end));
+      const wk = e.weeks[idx] || e.weeks[e.weeks.length - 1];
+      const open = e.weeks.slice(0, idx + 1).flatMap((w) => w.objs).filter((o) => !objDone(o));
+      const daysLeft = Math.ceil((e.date - now) / 86400000);
+      return { e, wk, idx, next: open[0] || null, behind: e.weeks.slice(0, idx).flatMap((w) => w.objs).filter((o) => !objDone(o)).length, daysLeft };
+    }
+    return null;
+  }
+  route(/^\/plan$/, () => {
+    const cfg = Object.assign({ hours: 6, d101: '', d102: '' }, Store.data.settings.plan || {});
+    const plan = cfg.d101 || cfg.d102 ? buildPlan(cfg) : null;
+    const wkHtml = (e) =>
+      e.past
+        ? `<div class="card"><b>Exam ${e.ex}-500</b>: the date ${fmtDay(e.date)} has passed — set a new date above.</div>`
+        : `<div class="card plan-head"><div class="row"><h2 style="margin:0">Exam ${e.ex}-500</h2><span class="spacer"></span><span class="badge ${e.tight ? 'bad' : 'good'}">${e.days} days left</span></div>
+          <p class="muted" style="margin:.4rem 0 0">${e.nWeeks} weeks until ${fmtDay(e.date)}: ${e.learnWeeks} weeks of learning, ${e.examWeeks} of exam training. ${e.doneCount}/${e.total} objectives already done.</p>
+          ${e.tight ? `<div class="callout warn" style="margin-top:.7rem"><div class="ct">Tight schedule</div><p>The remaining material needs about <b>${Math.ceil(e.needPerWeek)} hours per week</b> but you plan ${e.hours}. Increase the hours, move the date later or accept that the low-weight objectives get less time.</p></div>` : ''}</div>
+          ${e.weeks
+            .map((w) => {
+              const cur = plan.today <= w.end && plan.today >= w.start;
+              const body =
+                w.kind === 'learn'
+                  ? w.objs.length
+                    ? `<ul class="plan-list">${w.objs.map((o) => `<li class="${objDone(o) ? 'done' : ''}"><a href="#/obj/${o.id}"><b>${o.id}</b> ${esc(o.title)}</a> <span class="badge w">w${o.weight}</span><span class="muted"> ~${(Math.round(objHours(o) * 2) / 2).toFixed(1)} h</span></li>`).join('')}</ul>`
+                    : '<p class="muted">Nothing left in this week — use the time for the review and weak spots.</p>'
+                  : w.kind === 'exam'
+                    ? `<ul class="plan-list"><li><a href="#/weak">Weak spots</a>: practise the 20 weakest questions, twice this week</li><li><a href="#/exam/${e.ex}">One full exam simulation</a> (60 questions, 90 minutes) — then work through <b>every</b> wrong answer</li><li><a href="#/cheat">Cheatsheets</a> of your three weakest topics</li><li>Redo the labs and troubleshooting scenarios of those topics</li></ul>`
+                    : `<ul class="plan-list"><li><a href="#/exam/${e.ex}">Second exam simulation</a> — aim for more than 75 %</li><li>Go through the <a href="#/cheat">cheatsheets</a> once; wrong answers → <a href="#/review">Review</a></li><li>Last two days: only light review, no new material. Sleep well before the exam.</li></ul>`;
+              return `<details class="card plan-week ${cur ? 'cur' : ''}" ${cur ? 'open' : ''}><summary><b>Week ${w.n}</b> <span class="muted">${fmtDay(w.start)} – ${fmtDay(w.end)}</span>${cur ? ' <span class="badge good">this week</span>' : ''}<span class="muted" style="margin-left:auto">${w.kind === 'learn' ? (w.objs.length ? Math.round(w.h * 2) / 2 + ' h new material' : 'review') : w.kind === 'exam' ? 'exam training' : 'final week'}</span></summary>${body}<p class="plan-daily">Every day: <a href="#/review">15 minutes review</a> (spaced repetition)</p></details>`;
+            })
+            .join('')}`;
+    view.innerHTML = `<h1>🗓️ Study plan</h1><p class="muted">Enter your exam dates and how much time you have per week. The plan covers every objective, goes through the topics in order and ends with exam training. It is recalculated every day: finished objectives are skipped and the rest moves forward.</p>
+      <form class="card plan-form" id="planForm"><label>Exam 101-500 on<input type="date" class="inp" name="d101" value="${esc(cfg.d101)}"></label><label>Exam 102-500 on<input type="date" class="inp" name="d102" value="${esc(cfg.d102)}"></label><label>Hours per week<input type="number" class="inp" name="hours" min="1" max="40" step="0.5" value="${esc(cfg.hours)}"></label><button class="btn btn-primary" type="submit">Save plan</button>${plan ? '<button class="btn btn-ghost" type="button" id="planClear">Remove</button>' : ''}</form>
+      <p class="muted" style="font-size:.88rem">Leave a date empty if you do not plan that exam yet. If both dates are set, the 102 plan starts after the 101 exam.</p>
+      ${plan ? plan.exams.map(wkHtml).join('') : '<div class="card"><p>No plan yet. Pick at least one date. A rule of thumb: <b>8–10 hours a week</b> are enough for one exam in about 6–8 weeks.</p></div>'}`;
+    $('#planForm').onsubmit = (ev) => {
+      ev.preventDefault();
+      const f = new FormData(ev.target);
+      Store.setSetting('plan', { d101: f.get('d101') || '', d102: f.get('d102') || '', hours: +f.get('hours') || 6 });
+      toast('Plan saved');
+      render();
+    };
+    const clr = $('#planClear');
+    if (clr)
+      clr.onclick = () => {
+        Store.setSetting('plan', null);
+        render();
+      };
+  });
+
   /* =================== dashboard =================== */
   route(/^\/$/, () => {
     const all = LPIC.sorted();
@@ -341,54 +464,39 @@
     const st = answeredStats();
     const due = dueQuestions().length;
     const readCount = all.filter((o) => (Store.data.objectives[o.id] || {}).read).length;
-    const next = all.find((o) => mastery(o) < 0.6) || all[0];
-    const exams = Store.data.exams.slice(-6).reverse();
-    let h = `<div class="hero"><div style="flex:1;min-width:260px"><h1>LPIC-1 Trainer</h1><p class="muted" style="margin:0">Everything for <b>exam 101-500</b> and <b>102-500</b>: a wiki for every objective, ${LPIC.allQuestions().length} practice questions, a timed exam simulator, hands-on labs in a simulated Debian shell, and interactive simulations.</p>
-      <div class="row" style="margin-top:.9rem"><a class="btn btn-primary" href="#/obj/${next.id}">▶ Continue with ${next.id}</a><a class="btn" href="#/exam">⏱ Exam simulator</a>${due ? `<a class="btn" href="#/review">🔁 Review ${due} due</a>` : ''}<button class="btn" id="openTerm">⌨ Open sandbox</button></div></div>
-      <div class="big-ring" style="--p:${pct(r101)}"><span>${pct(r101)}%<small>Exam 101</small></span></div>
-      <div class="big-ring" style="--p:${pct(r102)}"><span>${pct(r102)}%<small>Exam 102</small></span></div></div>`;
-    h += `<div class="grid grid-4" style="margin-top:1.4rem">
-      <div class="card stat"><div class="v">${readCount}/${all.length}</div><div class="l">objectives studied</div></div>
-      <div class="card stat"><div class="v">${st.seen}</div><div class="l">questions answered (of ${LPIC.allQuestions().length})</div></div>
-      <div class="card stat"><div class="v">${st.n ? pct(st.acc) + '%' : '–'}</div><div class="l">answer accuracy</div></div>
-      <div class="card stat"><div class="v">${Store.streak()} 🔥</div><div class="l">day streak</div></div></div>`;
-    h += `<h2>Topics</h2><div class="grid grid-2">`;
+    const pt = planToday();
+    const next = (pt && pt.next) || all.find((o) => !objDone(o)) || all[0];
+    const ost = Store.obj(next.id);
+    const lab = LPIC.labs[next.id];
+    const labDone = lab ? Object.keys(ost.labs || {}).length : 0;
+    const qDone = next.quiz.filter((q) => (Store.data.questions[q.id] || {}).n).length;
+    const step = (ok, text, href) => `<a class="today-step ${ok ? 'ok' : ''}" href="${href}"><span class="tick">${ok ? '✓' : '○'}</span> ${text}</a>`;
+    let h = `<h1>Today</h1>`;
+    // one clear next step
+    h += `<div class="card today"><div class="muted" style="font-size:.88rem">${pt ? `Week ${pt.idx + 1} of ${pt.e.nWeeks} · exam ${pt.e.ex}-500 in ${pt.daysLeft} day${pt.daysLeft === 1 ? '' : 's'}${pt.behind ? ` · <b style="color:var(--warn)">${pt.behind} objective${pt.behind > 1 ? 's' : ''} behind</b>` : ''}` : 'Your next step'}</div>
+      ${pt && !pt.next ? `<h2 style="margin:.3rem 0 .6rem">This week's material is done 🎉</h2><p class="muted">Use the time for the review, the weak spots and the exam simulation.</p><div class="row"><a class="btn btn-primary" href="#/weak">Weak spots</a><a class="btn" href="#/exam/${pt.e.ex}">Exam simulation</a></div>` : `<h2 style="margin:.3rem 0 .8rem">${next.id} ${esc(next.title)}</h2>
+      <div class="today-steps">${step(ost.read, 'Read', `#/obj/${next.id}`)}${lab ? step(labDone === lab.tasks.length, `Lab (${labDone}/${lab.tasks.length})`, `#/obj/${next.id}/lab`) : ''}${step(qDone >= Math.min(10, next.quiz.length), `Quiz (${qDone}/${next.quiz.length})`, `#/obj/${next.id}/quiz`)}</div>
+      <a class="btn btn-primary btn-lg" href="#/obj/${next.id}">▶ ${ost.read ? 'Continue' : 'Start'} ${next.id}</a>`}</div>`;
+    h += `<div class="today-row">`;
+    h += due ? `<a class="card today-mini" href="#/review"><b>${due}</b><span>questions to review</span></a>` : `<div class="card today-mini muted"><b>0</b><span>reviews due</span></div>`;
+    h += `<a class="card today-mini" href="#/plan"><b>🗓️</b><span>${pt ? 'Study plan' : 'Set up a study plan'}</span></a>`;
+    h += `<a class="card today-mini" href="#/exam"><b>⏱️</b><span>Exam simulator</span></a></div>`;
+    h += `<p class="muted today-stats">${readCount}/${all.length} objectives studied · ${st.seen} questions answered${st.n ? ' · ' + pct(st.acc) + '% correct' : ''} · ${Store.streak()} day streak 🔥</p>`;
+    // everything else is one click away
+    h += `<details class="card overview"><summary><b>All topics</b> <span class="muted">Exam 101 ${pct(r101)}% · Exam 102 ${pct(r102)}%</span></summary><div class="grid grid-2" style="margin-top:.8rem">`;
     for (const ex of LPIC.exams) {
-      h += `<div class="card"><div class="row"><h3 style="margin:0">${ex.title} <span class="muted" style="font-weight:500">(${ex.code})</span></h3><span class="spacer"></span><span class="badge good">${pct(readiness(LPIC.ofExam(ex.id)))}% ready</span></div><p class="muted" style="margin:.2rem 0 .8rem;font-size:.88rem">${esc(ex.subtitle)}</p>`;
+      h += `<div><div class="row"><b>${ex.title}</b> <span class="muted">(${ex.code})</span><span class="spacer"></span><span class="badge good">${pct(readiness(LPIC.ofExam(ex.id)))}%</span></div>`;
       for (const t of ex.topics) {
         const objs = LPIC.ofTopic(t);
         const r = readiness(objs);
-        const w = objs.reduce((a, o) => a + o.weight, 0);
-        h += `<a href="#/topic/${t}" style="display:block;color:inherit;margin:.55rem 0"><div class="row" style="font-size:.9rem"><span>${LPIC.topics[t].icon} <b>${t}</b> ${esc(LPIC.topics[t].title)}</span><span class="spacer"></span><span class="muted">weight ${w} · ${pct(r)}%</span></div><div class="bar"><span style="width:${pct(r)}%"></span></div></a>`;
+        h += `<a href="#/topic/${t}" style="display:block;color:inherit;margin:.5rem 0"><div class="row" style="font-size:.9rem"><span>${LPIC.topics[t].icon} <b>${t}</b> ${esc(LPIC.topics[t].title)}</span><span class="spacer"></span><span class="muted">${pct(r)}%</span></div><div class="bar"><span style="width:${pct(r)}%"></span></div></a>`;
       }
       h += `</div>`;
     }
-    h += `</div>`;
-    // heatmap
-    const days = 7 * 18;
-    const today = new Date();
-    const start = new Date(today);
-    start.setDate(start.getDate() - days + 1 - ((start.getDay() + 0) % 1));
-    let cells = '';
-    for (let i = 0; i < days; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const v = Store.data.activity[k] || 0;
-      cells += `<i class="${v ? (v > 30 ? 'l3' : v > 10 ? 'l2' : 'l1') : ''}" title="${k}: ${v} actions"></i>`;
-    }
-    h += `<div class="grid grid-2" style="margin-top:1rem"><div class="card"><h3 style="margin-top:0">Activity</h3><div class="heat">${cells}</div><p class="muted" style="font-size:.82rem;margin-bottom:0">Every answered question, studied objective and lab task counts.</p></div>`;
-    h += `<div class="card"><h3 style="margin-top:0">Recent exam simulations</h3>${
-      exams.length
-        ? '<table><tr><th>Date</th><th>Exam</th><th>Score</th><th></th></tr>' + exams.map((e) => `<tr><td>${new Date(e.date).toLocaleDateString()}</td><td>${e.exam}</td><td>${e.correct}/${e.total} (${pct(e.correct / e.total)}%)</td><td>${e.correct / e.total >= 0.65 ? '<span class="badge good">pass</span>' : '<span class="badge bad">fail</span>'}</td></tr>`).join('') + '</table>'
-        : '<p class="muted">No attempt yet. The simulator draws 60 questions weighted like the real exam, 90 minutes.</p><a class="btn btn-sm" href="#/exam">Start one</a>'
-    }</div></div>`;
-    h += `<h2>How to use this site</h2><div class="grid grid-3">
-      <div class="card"><b>📚 Learn</b><p class="muted" style="font-size:.9rem;margin-bottom:0">Each objective has a wiki page covering every listed file, term and utility with examples. Click any <code>$ command</code> in an example to run it in the sandbox.</p></div>
-      <div class="card"><b>🧪 Practise</b><p class="muted" style="font-size:.9rem;margin-bottom:0">Labs check your work in a simulated Debian system (files, users, permissions, processes, packages, systemd …). The sandbox keeps your changes.</p></div>
-      <div class="card"><b>✅ Test</b><p class="muted" style="font-size:.9rem;margin-bottom:0">Quizzes with explanations, spaced-repetition review of mistakes and an exam simulator with timer. Progress is stored ${Store.server ? 'in the server database' : 'in your browser'}.</p></div></div>`;
+    h += `</div></details>`;
+    const exams = Store.data.exams.slice(-3).reverse();
+    if (exams.length) h += `<details class="card overview"><summary><b>Recent exam simulations</b> <a href="#/exam/history" class="muted">history →</a></summary><table style="margin-top:.6rem"><tr><th>Date</th><th>Exam</th><th>Score</th><th></th></tr>${exams.map((e) => `<tr><td>${new Date(e.date).toLocaleDateString()}</td><td>${e.exam}</td><td>${e.correct}/${e.total} (${pct(e.correct / e.total)}%)</td><td>${e.correct / e.total >= 0.65 ? '<span class="badge good">pass</span>' : '<span class="badge bad">fail</span>'}</td></tr>`).join('')}</table></details>`;
     view.innerHTML = h;
-    $('#openTerm').onclick = () => openDrawer();
   });
 
   /* =================== topic page =================== */
@@ -444,6 +552,8 @@
       });
     }
   });
+  // focus mode: the wiki is shown one section at a time (Settings → "Show every wiki page in full" turns it off)
+  const focusOn = () => Store.data.settings.focus !== false;
   function renderLearn(o, body) {
     const st = Store.obj(o.id);
     const r = MD.render(o.wiki || '', { idPrefix: 'w-' });
@@ -451,28 +561,108 @@
       const base = t.replace(/\s.*$/, '').replace(/[()]/g, '');
       return SIM.man[base] ? base : null;
     };
-    body.innerHTML = `<div class="wiki">
-      <div class="card" style="margin-bottom:1.2rem"><b>Description</b><p style="margin:.3rem 0 .8rem">${md(o.desc)}</p>
+    // split the rendered wiki into sections at each <h2>
+    const tmp = document.createElement('div');
+    tmp.innerHTML = r.html;
+    const sections = [];
+    let curSec = null;
+    for (const n of [...tmp.childNodes]) {
+      if (n.nodeType === 1 && n.tagName === 'H2') {
+        curSec = { id: n.id, title: n.textContent, nodes: [n] };
+        sections.push(curSec);
+      } else if (curSec) curSec.nodes.push(n);
+      else {
+        // text before the first heading belongs to the first section
+        if (!sections.length) sections.push((curSec = { id: 'intro', title: 'Overview', nodes: [] }));
+        curSec.nodes.push(n);
+      }
+    }
+    const focus = focusOn() && sections.length > 1;
+    const secHtml = sections.map((sec, i) => `<section class="wsec" data-i="${i}" id="sec-${i}">${sec.nodes.map((n) => (n.outerHTML !== undefined ? n.outerHTML : n.textContent)).join('')}</section>`).join('');
+    const refs = `<details class="card ref"><summary>Official objective: description, key knowledge, terms</summary><p style="margin:.6rem 0 .6rem">${md(o.desc)}</p>
         <b>Key knowledge areas</b><ul class="ka">${o.knowledge.map((k) => `<li>${md(k)}</li>`).join('')}</ul>
-        <b>Terms and utilities</b><div class="chips" style="margin-top:.4rem">${o.terms.map((t) => `<span class="chip ${knownTerm(t) ? 'known' : ''}" data-term="${esc(t)}" title="${knownTerm(t) ? 'show manual page' : t.startsWith('/') || t.startsWith('~') ? 'show in the sandbox' : 'search'}">${esc(t)}</span>`).join('')}</div></div>
-      ${deOn() && LPIC.deSummary[o.id] ? `<details class="card de-sum" lang="de" ${Store.data.settings.deOpen === false ? '' : 'open'}><summary><span class="de-flag">DE</span> Kurzfassung auf Deutsch</summary>${MD.render(LPIC.deSummary[o.id]).html}</details>` : ''}
-      ${r.toc.length > 2 ? `<div class="card toc">${r.toc.map((x) => `<a href="#/obj/${o.id}" data-anchor="${x.id}">${esc(x.text)}</a>`).join('')}</div>` : ''}
-      ${r.html}
-      <div class="card" style="margin-top:2rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:200px"><b>Done reading?</b><div class="muted" style="font-size:.88rem">Mark the objective as studied, then test yourself.</div></div>
-        <button class="btn ${st.read ? '' : 'btn-primary'}" id="readBtn">${st.read ? '✓ Studied (undo)' : '✓ Mark as studied'}</button><a class="btn" href="#/obj/${o.id}/quiz">Take the quiz →</a>${LPIC.labs[o.id] ? `<a class="btn" href="#/obj/${o.id}/lab">Open the lab →</a>` : ''}</div></div>`;
-    const ds = $('.de-sum', body);
-    if (ds) ds.addEventListener('toggle', () => Store.setSetting('deOpen', ds.open));
+        <b>Terms and utilities</b> <span class="muted" style="font-size:.85rem">(click for the manual page)</span><div class="chips" style="margin-top:.4rem">${o.terms.map((t) => `<span class="chip ${knownTerm(t) ? 'known' : ''}" data-term="${esc(t)}" title="${knownTerm(t) ? 'show manual page' : t.startsWith('/') || t.startsWith('~') ? 'show in the sandbox' : 'search'}">${esc(t)}</span>`).join('')}</div></details>`;
+    const de = deOn() && LPIC.deSummary[o.id] ? `<details class="card de-sum" lang="de"><summary><span class="de-flag">DE</span> Kurzfassung auf Deutsch</summary>${MD.render(LPIC.deSummary[o.id]).html}</details>` : '';
+    const doneCard = `<div class="card done-card"><div style="flex:1;min-width:200px"><b>Done reading?</b><div class="muted" style="font-size:.88rem">Mark the objective as studied, then test yourself.</div></div>
+        <button class="btn ${st.read ? '' : 'btn-primary'}" id="readBtn">${st.read ? '✓ Studied (undo)' : '✓ Mark as studied'}</button><a class="btn" href="#/obj/${o.id}/quiz">Take the quiz →</a>${LPIC.labs[o.id] ? `<a class="btn" href="#/obj/${o.id}/lab">Open the lab →</a>` : ''}</div>`;
+    body.innerHTML = `<div class="wiki ${focus ? 'focus' : ''}">
+      ${focus ? `<div class="stepper no-print"><div class="steps">${sections.map((sec, i) => `<button class="step" data-go="${i}" title="${esc(sec.title)}">${i + 1}</button>`).join('')}</div><span class="muted step-title" id="stepTitle"></span><span class="spacer"></span><button class="btn btn-sm btn-ghost" id="showAll" title="Show the whole page at once">Show all</button></div>` : sections.length > 2 ? `<div class="card toc">${sections.map((x, i) => `<a href="#/obj/${o.id}" data-anchor="sec-${i}">${esc(x.title)}</a>`).join('')}</div>` : ''}
+      ${secHtml}
+      ${focus ? `<div class="step-nav no-print"><button class="btn" id="stepPrev">← Back</button><span class="spacer"></span><button class="btn btn-primary" id="stepNext">Next →</button></div>` : ''}
+      <div class="wiki-extra">${refs}${de}</div>
+      <div id="doneWrap" ${focus ? 'hidden' : ''}>${doneCard}</div></div>`;
     $('#readBtn').onclick = () => {
       Store.setRead(o.id, !st.read);
       render();
     };
-    $$('[data-anchor]', body).forEach((a) =>
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        const t = document.getElementById(a.dataset.anchor);
-        if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      })
-    );
+    if (focus) {
+      let cur = 0;
+      const key = 'lpic1.step.' + o.id;
+      try {
+        cur = Math.min(sections.length - 1, +(sessionStorage.getItem(key) || 0));
+      } catch (e) {
+        cur = 0;
+      }
+      const seen = new Set();
+      const go = (i, scroll = true) => {
+        cur = Math.max(0, Math.min(sections.length - 1, i));
+        seen.add(cur);
+        $$('.wsec', body).forEach((el) => (el.hidden = +el.dataset.i !== cur));
+        $$('.step', body).forEach((el, k) => {
+          el.classList.toggle('cur', k === cur);
+          el.classList.toggle('seen', seen.has(k) && k !== cur);
+        });
+        $('#stepTitle').textContent = `${cur + 1} / ${sections.length} · ${sections[cur].title}`;
+        $('#stepPrev').disabled = cur === 0;
+        $('#stepNext').textContent = cur === sections.length - 1 ? 'Finish ✓' : 'Next →';
+        $('#doneWrap').hidden = cur !== sections.length - 1;
+        $('.wiki-extra', body).hidden = cur !== 0 && cur !== sections.length - 1;
+        try {
+          sessionStorage.setItem(key, String(cur));
+        } catch (e) {
+          /* private mode */
+        }
+        if (scroll) $('#stepTitle').scrollIntoView({ block: 'start', behavior: 'smooth' });
+      };
+      $$('.step', body).forEach((el) => el.addEventListener('click', () => go(+el.dataset.go)));
+      $('#stepPrev').onclick = () => go(cur - 1);
+      $('#stepNext').onclick = () => {
+        if (cur < sections.length - 1) go(cur + 1);
+        else {
+          if (!st.read) Store.setRead(o.id, true);
+          location.hash = `#/obj/${o.id}/quiz`;
+        }
+      };
+      $('#showAll').onclick = () => {
+        Store.setSetting('focus', false);
+        render();
+      };
+      const keyH = (e) => {
+        if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) || document.activeElement.closest('.term') || e.ctrlKey || e.altKey || e.metaKey) return;
+        if (e.key === 'ArrowRight') go(cur + 1);
+        else if (e.key === 'ArrowLeft') go(cur - 1);
+      };
+      document.addEventListener('keydown', keyH);
+      onLeave(() => document.removeEventListener('keydown', keyH));
+      go(cur, false);
+    } else if (sections.length > 1) {
+      $$('[data-anchor]', body).forEach((a) =>
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          const t = document.getElementById(a.dataset.anchor);
+          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        })
+      );
+      const tb = document.createElement('div');
+      tb.className = 'row no-print';
+      tb.style.margin = '.4rem 0';
+      tb.innerHTML = '<button class="btn btn-sm btn-ghost" id="focusOn">Step by step</button>';
+      body.querySelector('.wiki').insertBefore(tb, body.querySelector('.wiki').firstChild);
+      $('#focusOn').onclick = () => {
+        Store.setSetting('focus', true);
+        render();
+      };
+    }
     $$('.chip', body).forEach((c) =>
       c.addEventListener('click', () => {
         const t = c.dataset.term;
@@ -1389,11 +1579,14 @@
     view.innerHTML = `<h1>⚙️ Settings & backup</h1>
       <div class="card" style="max-width:720px"><h3 style="margin-top:0">Storage</h3><p>${Store.server ? '✅ Connected to the LPIC-1 Trainer server — progress and sandbox are stored in its <b>SQLite database</b> (Docker volume <code>lpic1-data</code>) and cached in this browser.' : 'ℹ️ No server detected — progress is stored in this browser only (localStorage). Start the Docker container (see README) to keep it in a persistent database.'}</p><p class="muted">Approx. ${used} KB of data.</p>
       <h3>Theme</h3><div class="row"><select class="inp" id="setTheme"><option value="auto">follow system</option><option value="dark">dark</option><option value="light">light</option></select></div>
+      <h3>Layout</h3><label class="row" style="gap:.5rem;cursor:pointer"><input type="checkbox" id="setFocus"> <span><b>Step-by-step reading</b>: show one section of a wiki page at a time (recommended — less text at once).</span></label>
       <h3>Language</h3><label class="row" style="gap:.5rem;cursor:pointer"><input type="checkbox" id="setDe"> <span>Show <b>German explanations</b> for questions and a <b>German summary</b> on every objective page (Deutsche Erklärungen und Kurzfassungen anzeigen). Questions stay in English like in the exam.</span></label>
       <h3>Backup</h3><div class="row"><button class="btn" id="exp">⬇ Export progress (JSON)</button><label class="btn">⬆ Import<input type="file" id="imp" accept="application/json" hidden></label></div>
       <h3>Reset</h3><div class="row"><button class="btn btn-danger" id="rstSandbox">Reset sandbox filesystem</button><button class="btn btn-danger" id="rstAll">Reset all progress</button></div></div>
       <div class="card" style="max-width:720px;margin-top:1rem"><h3 style="margin-top:0">Keyboard shortcuts</h3><table><tr><td><kbd>/</kbd></td><td>search</td></tr><tr><td><kbd>Ctrl</kbd>+<kbd>\`</kbd> or <kbd>Alt</kbd>+<kbd>T</kbd></td><td>toggle the sandbox terminal</td></tr><tr><td><kbd>1</kbd>–<kbd>5</kbd> / <kbd>A</kbd>–<kbd>E</kbd>, <kbd>Enter</kbd></td><td>answer / check / next in quizzes</td></tr><tr><td><kbd>Space</kbd>, <kbd>←</kbd>/<kbd>→</kbd></td><td>flip / rate flashcards</td></tr><tr><td><kbd>Tab</kbd>, <kbd>↑</kbd>/<kbd>↓</kbd>, <kbd>Ctrl</kbd>+<kbd>R</kbd>, <kbd>Ctrl</kbd>+<kbd>L</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>terminal: completion, history, reverse search, clear, cancel</td></tr></table></div>`;
     $('#setTheme').value = Store.data.settings.theme || 'auto';
+    $('#setFocus').checked = focusOn();
+    $('#setFocus').onchange = (e) => Store.setSetting('focus', e.target.checked);
     $('#setDe').checked = deOn();
     $('#setDe').onchange = (e) => {
       Store.setSetting('de', e.target.checked);
