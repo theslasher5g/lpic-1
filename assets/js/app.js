@@ -106,6 +106,27 @@
     applyTheme();
     toast('Theme: ' + next);
   };
+  /* calm mode: only the current task is visible (no sidebar, search, badges, extras) */
+  const zenOn = () => !!Store.data.settings.zen;
+  function applyZen() {
+    document.body.classList.toggle('zen', zenOn());
+    $('#zenExit').hidden = !zenOn();
+    $('#zenBtn').classList.toggle('on', zenOn());
+    if (zenOn()) closeDrawer && closeDrawer();
+  }
+  function setZen(v) {
+    Store.setSetting('zen', v);
+    applyZen();
+    toast(v ? 'Calm mode on — press Z or Esc to leave' : 'Calm mode off');
+  }
+  $('#zenBtn').onclick = () => setZen(!zenOn());
+  $('#zenExit').onclick = () => setZen(false);
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) || document.activeElement.closest('.term') || document.activeElement.isContentEditable) return;
+    if (e.key === 'z' || e.key === 'Z') setZen(!zenOn());
+    else if (e.key === 'Escape' && zenOn()) setZen(false);
+  });
   function syncBadge() {
     const b = $('#syncBadge');
     const s = Store.status;
@@ -528,7 +549,7 @@
     const labDone = lab ? Object.keys(st.labs || {}).length : 0;
     view.innerHTML = `<div class="crumbs"><a href="#/">Dashboard</a> › <a href="#/topic/${o.topic}">Topic ${o.topic}: ${esc(LPIC.topics[o.topic].title)}</a></div>
       <h1>${o.id} ${esc(o.title)}</h1>
-      <div class="row"><span class="badge w">Weight ${o.weight}</span><span class="badge">Exam ${o.exam}-500</span><span class="badge ${st.read ? 'good' : ''}">${st.read ? '✓ studied' : 'not studied yet'}</span><span class="badge">${qOk}/${o.quiz.length} questions correct</span>${lab ? `<span class="badge">${labDone}/${lab.tasks.length} lab tasks</span>` : ''}<span class="spacer"></span><a class="muted" style="font-size:.85rem" target="_blank" rel="noopener" href="https://learning.lpi.org/de/learning-materials/${o.exam}-500/${o.topic}/${o.id}/" title="Official LPI Learning Materials for this objective">📘 LPI Learning Materials</a><span class="muted" style="font-size:.85rem">mastery ${pct(mastery(o))}%</span></div>
+      <div class="row obj-badges"><span class="badge w">Weight ${o.weight}</span><span class="badge">Exam ${o.exam}-500</span><span class="badge ${st.read ? 'good' : ''}">${st.read ? '✓ studied' : 'not studied yet'}</span><span class="badge">${qOk}/${o.quiz.length} questions correct</span>${lab ? `<span class="badge">${labDone}/${lab.tasks.length} lab tasks</span>` : ''}<span class="spacer"></span><a class="muted" style="font-size:.85rem" target="_blank" rel="noopener" href="https://learning.lpi.org/de/learning-materials/${o.exam}-500/${o.topic}/${o.id}/" title="Official LPI Learning Materials for this objective">📘 LPI Learning Materials</a><span class="muted" style="font-size:.85rem">mastery ${pct(mastery(o))}%</span></div>
       <div class="tabs" role="tablist">
         <a class="tab ${tab === 'learn' ? 'active' : ''}" href="#/obj/${o.id}">📚 Learn</a>
         <a class="tab ${tab === 'quiz' ? 'active' : ''}" href="#/obj/${o.id}/quiz">❓ Quiz <span class="badge">${o.quiz.length}</span></a>
@@ -1580,11 +1601,14 @@
       <div class="card" style="max-width:720px"><h3 style="margin-top:0">Storage</h3><p>${Store.server ? '✅ Connected to the LPIC-1 Trainer server — progress and sandbox are stored in its <b>SQLite database</b> (Docker volume <code>lpic1-data</code>) and cached in this browser.' : 'ℹ️ No server detected — progress is stored in this browser only (localStorage). Start the Docker container (see README) to keep it in a persistent database.'}</p><p class="muted">Approx. ${used} KB of data.</p>
       <h3>Theme</h3><div class="row"><select class="inp" id="setTheme"><option value="auto">follow system</option><option value="dark">dark</option><option value="light">light</option></select></div>
       <h3>Layout</h3><label class="row" style="gap:.5rem;cursor:pointer"><input type="checkbox" id="setFocus"> <span><b>Step-by-step reading</b>: show one section of a wiki page at a time (recommended — less text at once).</span></label>
+      <h3>Calm mode</h3><label class="row" style="gap:.5rem;cursor:pointer"><input type="checkbox" id="setZen"> <span><b>Calm mode</b>: hide the sidebar, search and all extras — only what you are working on stays. Toggle anytime with the <kbd>Z</kbd> key or the “Calm” button in the top bar.</span></label>
       <h3>Language</h3><label class="row" style="gap:.5rem;cursor:pointer"><input type="checkbox" id="setDe"> <span>Show <b>German explanations</b> for questions and a <b>German summary</b> on every objective page (Deutsche Erklärungen und Kurzfassungen anzeigen). Questions stay in English like in the exam.</span></label>
       <h3>Backup</h3><div class="row"><button class="btn" id="exp">⬇ Export progress (JSON)</button><label class="btn">⬆ Import<input type="file" id="imp" accept="application/json" hidden></label></div>
       <h3>Reset</h3><div class="row"><button class="btn btn-danger" id="rstSandbox">Reset sandbox filesystem</button><button class="btn btn-danger" id="rstAll">Reset all progress</button></div></div>
       <div class="card" style="max-width:720px;margin-top:1rem"><h3 style="margin-top:0">Keyboard shortcuts</h3><table><tr><td><kbd>/</kbd></td><td>search</td></tr><tr><td><kbd>Ctrl</kbd>+<kbd>\`</kbd> or <kbd>Alt</kbd>+<kbd>T</kbd></td><td>toggle the sandbox terminal</td></tr><tr><td><kbd>1</kbd>–<kbd>5</kbd> / <kbd>A</kbd>–<kbd>E</kbd>, <kbd>Enter</kbd></td><td>answer / check / next in quizzes</td></tr><tr><td><kbd>Space</kbd>, <kbd>←</kbd>/<kbd>→</kbd></td><td>flip / rate flashcards</td></tr><tr><td><kbd>Tab</kbd>, <kbd>↑</kbd>/<kbd>↓</kbd>, <kbd>Ctrl</kbd>+<kbd>R</kbd>, <kbd>Ctrl</kbd>+<kbd>L</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd></td><td>terminal: completion, history, reverse search, clear, cancel</td></tr></table></div>`;
     $('#setTheme').value = Store.data.settings.theme || 'auto';
+    $('#setZen').checked = zenOn();
+    $('#setZen').onchange = (e) => setZen(e.target.checked);
     $('#setFocus').checked = focusOn();
     $('#setFocus').onchange = (e) => Store.setSetting('focus', e.target.checked);
     $('#setDe').checked = deOn();
@@ -1638,6 +1662,7 @@
   Store.onChange(syncBadge);
   Store.init().then(() => {
     applyTheme();
+    applyZen();
     syncBadge();
     render();
   });

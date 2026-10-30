@@ -2107,3 +2107,71 @@ details.card {
 .nav-more > summary::-webkit-details-marker {
   display: none;
 }
+
+/* calm mode */
+#zenBtn.on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.zen-exit {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 60;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: var(--fg2);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font: 500 0.82rem var(--sans);
+  cursor: pointer;
+  opacity: 0.75;
+  box-shadow: var(--shadow);
+}
+.zen-exit:hover {
+  opacity: 1;
+}
+.zen-exit[hidden] {
+  display: none;
+}
+body.zen .sidebar,
+body.zen .search,
+body.zen .sync,
+body.zen #themeBtn,
+body.zen #termBtn,
+body.zen .menu-btn,
+body.zen .crumbs,
+body.zen .obj-badges,
+body.zen .tabs,
+body.zen .wiki-extra,
+body.zen .de-ex,
+body.zen .step-title,
+body.zen .today-row,
+body.zen .today-stats,
+body.zen .overview,
+body.zen .drawer,
+body.zen .pager-nav,
+body.zen #zenBtn ~ .icon-btn {
+  display: none !important;
+}
+body.zen .layout {
+  display: block;
+}
+body.zen .view {
+  margin: 0 auto;
+  max-width: 760px;
+  padding-top: 2rem;
+}
+body.zen .topbar {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+body.zen .brand-text {
+  display: none;
+}
+body.zen .stepper {
+  top: 0;
+}
+body.zen .card {
+  box-shadow: none;
+}

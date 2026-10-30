@@ -17,6 +17,7 @@
     <input id="searchInput" type="search" placeholder="Search wiki, commands, files…  ( / )" aria-label="Search" autocomplete="off">
   </form>
   <span class="sync" id="syncBadge" title="Where your progress is stored">local</span>
+  <button class="btn btn-sm" id="zenBtn" aria-label="Calm mode" title="Calm mode: hide everything except what you are working on (Z)">Calm</button>
   <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" title="Theme">◐</button>
   <button class="btn btn-term" id="termBtn" title="Open the sandbox terminal (Ctrl+`)"><span>⌨</span><span class="hide-sm"> Terminal</span></button>
 </header>
@@ -24,6 +25,7 @@
   <nav class="sidebar" id="sidebar" aria-label="Objectives"></nav>
   <main id="view" class="view" tabindex="-1"></main>
 </div>
+<button class="zen-exit" id="zenExit" hidden title="Leave calm mode (Esc or Z)">Calm mode on · leave</button>
 <section class="drawer" id="drawer" aria-label="Sandbox terminal">
   <div class="drawer-bar" id="drawerBar">
     <span class="drawer-title">student@lpic-lab — sandbox <span class="muted">(persistent · try <code>help</code>)</span></span>

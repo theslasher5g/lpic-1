@@ -124,6 +124,24 @@ const ok = (cond, name, info) => {
     await page.click('#focusOn');
     await page.waitForTimeout(300);
 
+    console.log('■ calm mode');
+    await visit('#/obj/103.4', 400);
+    await page.click('#zenBtn');
+    await page.waitForTimeout(200);
+    ok(await page.evaluate(() => document.body.classList.contains('zen')), 'calm mode switches on');
+    ok(!(await page.isVisible('#sidebar')) && !(await page.isVisible('#searchInput')), 'sidebar and search are hidden in calm mode');
+    ok(await page.isVisible('.wsec:not([hidden])') && (await page.isVisible('#stepNext')), 'the current wiki step stays visible');
+    await visit('#/obj/103.4', 400);
+    ok(await page.evaluate(() => document.body.classList.contains('zen')), 'calm mode survives a reload (stored in the settings)');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    ok(!(await page.evaluate(() => document.body.classList.contains('zen'))) && (await page.isVisible('#sidebar')), 'Esc leaves calm mode');
+    await page.keyboard.press('z');
+    await page.waitForTimeout(150);
+    ok(await page.evaluate(() => document.body.classList.contains('zen')), 'Z toggles calm mode on');
+    await page.keyboard.press('z');
+    await page.waitForTimeout(150);
+
     console.log('■ lab and scenario');
     await visit('#/obj/104.6/lab', 500);
     for (const c of ['ln orig.txt orig-hard', 'ln -s orig.txt orig-sym']) await type('#labTerm', c);
