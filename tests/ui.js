@@ -145,6 +145,10 @@ const ok = (cond, name, info) => {
     console.log('■ lab and scenario');
     await visit('#/obj/104.6/lab', 500);
     for (const c of ['ln orig.txt orig-hard', 'ln -s orig.txt orig-sym']) await type('#labTerm', c);
+    ok((await page.$$('#tasks .hint')).length === 0 || (await page.$$('#tasks li:not(.done) .hint')).length === 0, 'lab hints of open tasks are hidden by default');
+    ok((await page.$$('#tasks li:not(.done) .hint-btn')).length > 0, 'open tasks offer a "Show hint" button');
+    await page.click('#tasks li:not(.done) .hint-btn');
+    ok((await page.$$('#tasks .hint')).length >= 1, 'clicking "Show hint" reveals the hint');
     ok(/^2\//.test(await page.textContent('#labCount')), 'lab 104.6: two tasks completed', await page.textContent('#labCount'));
     await visit('#/scenario/network-down', 500);
     for (const c of ['ping -c 1 example.com', 'ping -c 1 192.168.56.1', 'ping -c 1 8.8.8.8', 'ip route', 'sudo ip route add default via 192.168.56.1']) await type('#labTerm', c);

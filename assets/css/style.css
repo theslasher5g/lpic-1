@@ -2175,3 +2175,17 @@ body.zen .stepper {
 body.zen .card {
   box-shadow: none;
 }
+
+.hint-btn {
+  margin-top: 0.3rem;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 500 0.82rem var(--sans);
+  cursor: pointer;
+  padding: 0.1rem 0;
+}
+.hint-btn:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}

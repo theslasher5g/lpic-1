@@ -1403,7 +1403,7 @@
   /* =================== labs =================== */
   function renderLab(o, lab, body) {
     const st = Store.obj(o.id);
-    body.innerHTML = `<div class="lab"><div><div class="card" style="margin-bottom:.8rem">${MD.render(lab.intro || '').html}<p class="muted" style="font-size:.85rem;margin:.3rem 0 0">This lab runs in its own fresh simulated system (it does not change your sandbox). Tasks are checked automatically after every command. Click a hint's command to type it.</p></div><div class="inline-term" id="labTerm"></div></div>
+    body.innerHTML = `<div class="lab"><div><div class="card" style="margin-bottom:.8rem">${MD.render(lab.intro || '').html}<p class="muted" style="font-size:.85rem;margin:.3rem 0 0">This lab runs in its own fresh simulated system (it does not change your sandbox). Tasks are checked automatically after every command. Hints are hidden until you ask for them.</p></div><div class="inline-term" id="labTerm"></div></div>
       <div class="card"><div class="row"><b>Tasks</b><span class="spacer"></span><span class="badge" id="labCount"></span></div><ol class="tasks" id="tasks"></ol><div class="row" style="margin-top:.8rem"><button class="btn btn-sm" id="labReset">↺ Reset lab</button><button class="btn btn-sm btn-ghost" id="labHints">Show all hints</button></div></div></div>`;
     let lastCmd = '';
     let lastStatus = 0;
@@ -1425,14 +1425,22 @@
     });
     t.print(`\x1b[1;32m${o.id.startsWith("sc:") ? "Scenario" : "Lab " + o.id}: ${lab.title || o.title}\x1b[0m\n\x1b[2m${(lab.motd || 'Work through the tasks on the right. Type "help" for shell help.').replace(/\n/g, '\n')}\x1b[0m\n\n`);
     const done = new Set(Object.keys(st.labs || {}).map(Number));
+    // hints (they contain the solution) stay hidden until you ask for them: per task, or for all tasks
     let showHints = false;
+    const shown = new Set();
     const draw = () => {
       $('#tasks').innerHTML = lab.tasks
-        .map(
-          (task, i) =>
-            `<li class="${done.has(i) ? 'done' : ''}"><div><div class="tt">${md(task.t)}</div>${task.hint && (showHints || done.has(i) || i === firstOpen()) ? `<div class="hint">💡 ${md(task.hint)}</div>` : ''}</div></li>`
-        )
+        .map((task, i) => {
+          const open = task.hint && (showHints || shown.has(i) || done.has(i));
+          return `<li class="${done.has(i) ? 'done' : ''}"><div><div class="tt">${md(task.t)}</div>${open ? `<div class="hint">💡 ${md(task.hint)}</div>` : task.hint ? `<button class="hint-btn" data-hint="${i}">💡 Show hint</button>` : ''}</div></li>`;
+        })
         .join('');
+      $$('#tasks .hint-btn').forEach((b) =>
+        b.addEventListener('click', () => {
+          shown.add(+b.dataset.hint);
+          draw();
+        })
+      );
       $('#labCount').textContent = `${done.size}/${lab.tasks.length}`;
       $$('#tasks .hint code').forEach((c) =>
         c.addEventListener('click', () => {
@@ -1470,6 +1478,7 @@
     $('#labReset').onclick = () => render();
     $('#labHints').onclick = () => {
       showHints = !showHints;
+      $('#labHints').textContent = showHints ? 'Hide all hints' : 'Show all hints';
       draw();
     };
     setTimeout(() => t.focus(), 50);
